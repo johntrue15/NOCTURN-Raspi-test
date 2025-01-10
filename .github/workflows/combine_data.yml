@@ -77,7 +77,7 @@ jobs:
         fi
     
     - name: Combine data
-      run: python .github/scripts/custom.py data/output/combined_analysis.md input_files.txt
+      run: python .github/scripts/data_combiner.py data/output/combined_analysis.md input_files.txt
     
     - name: Commit combined analysis
       run: |
