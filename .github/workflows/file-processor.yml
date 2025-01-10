@@ -48,6 +48,10 @@ jobs:
                 echo "Processing PCR file: $file"
                 python .github/scripts/pcr_to_json.py "$file"
                 ;;
+              "vgl")
+                echo "Processing VGL file: $file"
+                python .github/scripts/vgl_to_json.py "$file"
+                ;;
               *)
                 echo "Unknown file type: $file"
                 ;;
