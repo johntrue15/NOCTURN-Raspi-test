@@ -66,30 +66,18 @@ jobs:
         python -m pip install --upgrade pip
         pip install pandas tabulate
     
-    - name: Prepare file list
-      id: prepare-files
+    - name: Create input file
       run: |
-        files=""
-        # Add first file (required)
-        files="${{ github.event.inputs.file1 }} ${{ github.event.inputs.type1 }}"
-        
-        # Add second file if provided
+        echo '${{ github.event.inputs.file1 }}|${{ github.event.inputs.type1 }}' > input_files.txt
         if [ "${{ github.event.inputs.type2 }}" != "none" ]; then
-          files="$files ${{ github.event.inputs.file2 }} ${{ github.event.inputs.type2 }}"
+          echo '${{ github.event.inputs.file2 }}|${{ github.event.inputs.type2 }}' >> input_files.txt
         fi
-        
-        # Add third file if provided
         if [ "${{ github.event.inputs.type3 }}" != "none" ]; then
-          files="$files ${{ github.event.inputs.file3 }} ${{ github.event.inputs.type3 }}"
+          echo '${{ github.event.inputs.file3 }}|${{ github.event.inputs.type3 }}' >> input_files.txt
         fi
-        
-        echo "files=$files" >> $GITHUB_OUTPUT
     
     - name: Combine data
-      run: |
-        python .github/scripts/data_combiner.py \
-          data/output/combined_analysis.md \
-          ${{ steps.prepare-files.outputs.files }}
+      run: python .github/scripts/custom.py data/output/combined_analysis.md input_files.txt
     
     - name: Commit combined analysis
       run: |
@@ -98,7 +86,6 @@ jobs:
         
         git add data/output/combined_analysis.md
         
-        # Commit if there are changes
         if git diff --staged --quiet; then
           echo "No changes to commit"
         else
