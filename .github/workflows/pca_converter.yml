@@ -1,9 +1,9 @@
 name: PCA File Processor
 
 on:
-  push:
-    paths:
-      - '**.pca'
+ # push:
+  #  paths:
+  #    - '**.pca'
   workflow_dispatch:
     inputs:
       input_dir:
