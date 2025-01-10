@@ -36,13 +36,13 @@ jobs:
     - name: Create directories
       run: |
         mkdir -p ${{ github.event.inputs.input_dir || 'data/input' }}
-        mkdir -p ${{ github.event.inputs.output_dir || 'output' }}
+        mkdir -p ${{ github.event.inputs.output_dir || 'data/output' }}
         mkdir -p ${{ github.event.inputs.archive_dir || 'data/archive' }}
     
     - name: Run PCA processor
       env:
         INPUT_DIR: ${{ github.event.inputs.input_dir || 'data/input' }}
-        OUTPUT_DIR: ${{ github.event.inputs.output_dir || 'output' }}
+        OUTPUT_DIR: ${{ github.event.inputs.output_dir || 'data/output' }}
         ARCHIVE_DIR: ${{ github.event.inputs.archive_dir || 'data/archive' }}
       run: python .github/scripts/pca_to_json.py
     
