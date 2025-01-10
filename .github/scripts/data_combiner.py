@@ -5,9 +5,11 @@ Combines data from multiple JSON files into a human-readable table format.
 """
 import json
 import sys
+import os
 from pathlib import Path
 import pandas as pd
 from typing import Dict, List, Any, Union
+from datetime import datetime
 
 class DataCombiner:
     def __init__(self):
@@ -74,12 +76,13 @@ class DataCombiner:
                 
         return metrics
 
-    def combine_data(self, input_file: Path) -> pd.DataFrame:
+    def combine_data(self, input_file: Path) -> tuple[pd.DataFrame, List[str]]:
         """
         Combine data from multiple files into a DataFrame.
-        input_file: Path to file containing filename|type pairs
+        Returns the DataFrame and list of processed files.
         """
         combined_data = {}
+        processed_files = []
         
         with open(input_file, 'r') as f:
             for line in f:
@@ -93,6 +96,7 @@ class DataCombiner:
                 try:
                     # Try to find the correct JSON file
                     json_file = self.find_json_file(file_spec, file_type)
+                    processed_files.append(f"{file_spec}.{file_type}")
                     
                     # Load and process the data
                     json_data = self.load_json_file(json_file)
@@ -113,30 +117,45 @@ class DataCombiner:
         for col in df.columns:
             df[col] = df[col].apply(lambda x: f"{x:.2f}" if isinstance(x, float) else str(x))
         
-        return df
+        return df, processed_files
 
     def generate_markdown_table(self, df: pd.DataFrame) -> str:
         """Generate a markdown formatted table from DataFrame."""
         return df.to_markdown()
 
-    def save_output(self, content: str, output_path: Path) -> None:
-        """Save the combined data as a markdown file."""
-        with open(output_path, 'w') as f:
+    def save_output(self, content: str, output_dir: Path, processed_files: List[str]) -> None:
+        """Save the combined data as a markdown file with timestamp."""
+        # Create timestamp
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        
+        # Create filename using processed files and timestamp
+        filename = f"combined_{'_'.join(processed_files)}_{timestamp}.md"
+        
+        # Ensure the output directory exists
+        output_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Save the file
+        with open(output_dir / filename, 'w') as f:
             f.write("# Combined Analysis Results\n\n")
+            f.write(f"Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
+            f.write("Files analyzed:\n")
+            for file in processed_files:
+                f.write(f"- {file}\n")
+            f.write("\n## Results\n\n")
             f.write(content)
 
 def main():
     if len(sys.argv) != 3:
-        print("Usage: python custom.py <output_path> <input_file>")
+        print("Usage: python custom.py <output_dir> <input_file>")
         sys.exit(1)
 
-    output_path = Path(sys.argv[1])
+    output_dir = Path(sys.argv[1])
     input_file = Path(sys.argv[2])
     
     combiner = DataCombiner()
-    df = combiner.combine_data(input_file)
+    df, processed_files = combiner.combine_data(input_file)
     markdown_table = combiner.generate_markdown_table(df)
-    combiner.save_output(markdown_table, output_path)
+    combiner.save_output(markdown_table, output_dir, processed_files)
 
 if __name__ == "__main__":
     main()
