@@ -1,0 +1,73 @@
+name: File Processor
+
+on:
+  push:
+    paths:
+      - 'data/input/**'
+
+jobs:
+  process-files:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install numpy pandas
+    
+    - name: Detect and process files
+      id: file-detection
+      run: |
+        # Get list of new files in data/input
+        for file in data/input/*; do
+          if [[ -f "$file" ]]; then
+            ext="${file##*.}"
+            case "$ext" in
+              "pca")
+                echo "Processing PCA file: $file"
+                python .github/scripts/pca_to_json.py "$file"
+                ;;
+              "pcj")
+                echo "Processing PCJ file: $file"
+                python .github/scripts/pcj_to_json.py "$file"
+                ;;
+              *)
+                echo "Unknown file type: $file"
+                ;;
+            esac
+          fi
+        done
+    
+    - name: Move processed files to archive
+      run: |
+        mkdir -p data/archive
+        for file in data/input/*; do
+          if [[ -f "$file" ]]; then
+            mv "$file" data/archive/
+          fi
+        done
+    
+    - name: Commit JSON outputs
+      run: |
+        git config --local user.email "github-actions[bot]@users.noreply.github.com"
+        git config --local user.name "github-actions[bot]"
+        
+        # Add any new JSON files in data/output
+        git add data/output/*.json
+        
+        # Commit if there are changes
+        if git diff --staged --quiet; then
+          echo "No changes to commit"
+        else
+          git commit -m "Update JSON outputs [skip ci]"
+          git push
+        fi
