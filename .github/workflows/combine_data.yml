@@ -1,0 +1,107 @@
+name: Combine Data Files
+
+on:
+  workflow_dispatch:
+    inputs:
+      file1:
+        description: 'First filename (without extension)'
+        required: true
+      type1:
+        description: 'First file type (pca/pcj/pcp/pcr/vgl)'
+        required: true
+        type: choice
+        options:
+          - pca
+          - pcj
+          - pcp
+          - pcr
+          - vgl
+      file2:
+        description: 'Second filename (without extension)'
+        required: false
+      type2:
+        description: 'Second file type (pca/pcj/pcp/pcr/vgl)'
+        required: false
+        type: choice
+        options:
+          - none
+          - pca
+          - pcj
+          - pcp
+          - pcr
+          - vgl
+        default: 'none'
+      file3:
+        description: 'Third filename (without extension)'
+        required: false
+      type3:
+        description: 'Third file type (pca/pcj/pcp/pcr/vgl)'
+        required: false
+        type: choice
+        options:
+          - none
+          - pca
+          - pcj
+          - pcp
+          - pcr
+          - vgl
+        default: 'none'
+
+jobs:
+  combine-data:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pandas tabulate
+    
+    - name: Prepare file list
+      id: prepare-files
+      run: |
+        files=""
+        # Add first file (required)
+        files="${{ github.event.inputs.file1 }} ${{ github.event.inputs.type1 }}"
+        
+        # Add second file if provided
+        if [ "${{ github.event.inputs.type2 }}" != "none" ]; then
+          files="$files ${{ github.event.inputs.file2 }} ${{ github.event.inputs.type2 }}"
+        fi
+        
+        # Add third file if provided
+        if [ "${{ github.event.inputs.type3 }}" != "none" ]; then
+          files="$files ${{ github.event.inputs.file3 }} ${{ github.event.inputs.type3 }}"
+        fi
+        
+        echo "files=$files" >> $GITHUB_OUTPUT
+    
+    - name: Combine data
+      run: |
+        python .github/scripts/custom.py \
+          data/output/combined_analysis.md \
+          ${{ steps.prepare-files.outputs.files }}
+    
+    - name: Commit combined analysis
+      run: |
+        git config --local user.email "github-actions[bot]@users.noreply.github.com"
+        git config --local user.name "github-actions[bot]"
+        
+        git add data/output/combined_analysis.md
+        
+        # Commit if there are changes
+        if git diff --staged --quiet; then
+          echo "No changes to commit"
+        else
+          git commit -m "Update combined analysis [skip ci]"
+          git push
+        fi
