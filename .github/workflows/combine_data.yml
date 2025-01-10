@@ -87,7 +87,7 @@ jobs:
     
     - name: Combine data
       run: |
-        python .github/scripts/custom.py \
+        python .github/scripts/data_combiner.py \
           data/output/combined_analysis.md \
           ${{ steps.prepare-files.outputs.files }}
     
