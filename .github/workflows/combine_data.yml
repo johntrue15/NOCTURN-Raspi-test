@@ -76,15 +76,18 @@ jobs:
           echo '${{ github.event.inputs.file3 }}|${{ github.event.inputs.type3 }}' >> input_files.txt
         fi
     
+    - name: Create output directory
+      run: mkdir -p data/combined_analysis_markdown
+    
     - name: Combine data
-      run: python .github/scripts/data_combiner.py data/output/combined_analysis.md input_files.txt
+      run: python .github/scripts/data_combiner.py data/combined_analysis_markdown input_files.txt
     
     - name: Commit combined analysis
       run: |
         git config --local user.email "github-actions[bot]@users.noreply.github.com"
         git config --local user.name "github-actions[bot]"
         
-        git add data/output/combined_analysis.md
+        git add data/combined_analysis_markdown/*.md
         
         if git diff --staged --quiet; then
           echo "No changes to commit"
