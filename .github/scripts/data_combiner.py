@@ -8,6 +8,7 @@ import sys
 import pandas as pd
 from pathlib import Path
 from typing import Dict, List, Any, Union
+import glob
 
 class DataCombiner:
     def __init__(self):
@@ -17,6 +18,24 @@ class DataCombiner:
         """Load a JSON file and return its contents."""
         with open(file_path, 'r') as f:
             return json.load(f)
+
+    def find_json_file(self, base_name: str, file_type: str) -> Path:
+        """Find the correct JSON file based on the base name and type."""
+        output_dir = Path('data/output')
+        
+        # Handle both naming patterns
+        patterns = [
+            f"{base_name}.{file_type}.json",  # Pattern: Name.type.json
+            f"{base_name}.json",              # Pattern: Name.json
+        ]
+        
+        for pattern in patterns:
+            # Use glob to find files that match the pattern
+            matches = list(output_dir.glob(pattern))
+            if matches:
+                return matches[0]
+        
+        raise FileNotFoundError(f"No matching file found for {base_name} with type {file_type}")
 
     def extract_key_metrics(self, data: Dict, file_type: str) -> Dict:
         """Extract key metrics based on file type."""
@@ -30,6 +49,8 @@ class DataCombiner:
             # Extract PCJ specific metrics
             if 'info' in data:
                 metrics = data['info']
+            if 'data' in data and data['data']:
+                metrics['last_data_point'] = data['data'][-1]
             
         elif file_type == 'pcp':
             # Extract PCP specific metrics
@@ -40,9 +61,11 @@ class DataCombiner:
                 
         elif file_type == 'pcr':
             # Extract PCR specific metrics
-            for section in data.values():
-                if isinstance(section, dict):
-                    metrics.update(section)
+            for section, content in data.items():
+                if isinstance(content, dict):
+                    for key, value in content.items():
+                        if isinstance(value, (int, float, str, bool)):
+                            metrics[f"{section}_{key}"] = value
                     
         elif file_type == 'vgl':
             # Extract VGL specific metrics
@@ -60,26 +83,34 @@ class DataCombiner:
         """
         combined_data = {}
         
-        for filename, file_type in files:
+        for file_spec, file_type in files:
             try:
-                file_path = Path('data/output') / f"{Path(filename).stem}.{file_type}.json"
-                if not file_path.exists():
-                    print(f"Warning: File {file_path} not found")
+                # Try to find the correct JSON file
+                try:
+                    json_file = self.find_json_file(file_spec, file_type)
+                except FileNotFoundError as e:
+                    print(f"Warning: {str(e)}")
                     continue
-                    
+                
                 # Load and process the data
-                json_data = self.load_json_file(file_path)
+                json_data = self.load_json_file(json_file)
                 metrics = self.extract_key_metrics(json_data, file_type)
                 
                 # Add to combined data
-                combined_data[f"{filename} ({file_type})"] = metrics
+                combined_data[f"{json_file.stem} ({file_type})"] = metrics
                 
             except Exception as e:
-                print(f"Error processing {filename}: {str(e)}")
+                print(f"Error processing {file_spec}: {str(e)}")
                 continue
         
         # Convert to DataFrame
         df = pd.DataFrame(combined_data).transpose()
+        
+        # Clean up the DataFrame
+        df = df.fillna('N/A')  # Replace NaN with N/A
+        # Convert numbers to string with reasonable precision
+        for col in df.columns:
+            df[col] = df[col].apply(lambda x: f"{x:.2f}" if isinstance(x, float) else str(x))
         
         return df
 
