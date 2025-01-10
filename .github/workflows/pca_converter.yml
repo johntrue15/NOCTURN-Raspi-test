@@ -13,7 +13,7 @@ on:
       output_dir:
         description: 'Directory for JSON output'
         required: false
-        default: 'data/output'
+        default: 'output'
       archive_dir:
         description: 'Directory for processed PCA files'
         required: false
@@ -22,6 +22,8 @@ on:
 jobs:
   process-pca:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     
     steps:
     - uses: actions/checkout@v3
@@ -34,22 +36,22 @@ jobs:
     - name: Create directories
       run: |
         mkdir -p ${{ github.event.inputs.input_dir || 'data/input' }}
-        mkdir -p ${{ github.event.inputs.output_dir || 'data/output' }}
+        mkdir -p ${{ github.event.inputs.output_dir || 'output' }}
         mkdir -p ${{ github.event.inputs.archive_dir || 'data/archive' }}
     
     - name: Run PCA processor
       env:
         INPUT_DIR: ${{ github.event.inputs.input_dir || 'data/input' }}
-        OUTPUT_DIR: ${{ github.event.inputs.output_dir || 'data/output' }}
+        OUTPUT_DIR: ${{ github.event.inputs.output_dir || 'output' }}
         ARCHIVE_DIR: ${{ github.event.inputs.archive_dir || 'data/archive' }}
       run: python .github/scripts/pca_to_json.py
     
-    - name: Upload JSON artifacts
-      uses: actions/upload-artifact@v3
-      with:
-        name: processed-pca-files
-        path: ${{ github.event.inputs.output_dir || 'data/output' }}/*.json
-        retention-days: 90
+    - name: Commit JSON files
+      run: |
+        git config --local user.email "github-actions[bot]@users.noreply.github.com"
+        git config --local user.name "github-actions[bot]"
+        git add ${{ github.event.inputs.output_dir || 'output' }}/*.json
+        git diff --quiet && git diff --staged --quiet || (git commit -m "Update JSON outputs from PCA processing [skip ci]" && git push)
     
     - name: Upload archived PCA files
       uses: actions/upload-artifact@v3
