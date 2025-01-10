@@ -1,0 +1,59 @@
+name: PCA File Processor
+
+on:
+  push:
+    paths:
+      - '**.pca'
+  workflow_dispatch:
+    inputs:
+      input_dir:
+        description: 'Directory containing PCA files'
+        required: false
+        default: 'data/input'
+      output_dir:
+        description: 'Directory for JSON output'
+        required: false
+        default: 'data/output'
+      archive_dir:
+        description: 'Directory for processed PCA files'
+        required: false
+        default: 'data/archive'
+
+jobs:
+  process-pca:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+    
+    - name: Create directories
+      run: |
+        mkdir -p ${{ github.event.inputs.input_dir || 'data/input' }}
+        mkdir -p ${{ github.event.inputs.output_dir || 'data/output' }}
+        mkdir -p ${{ github.event.inputs.archive_dir || 'data/archive' }}
+    
+    - name: Run PCA processor
+      env:
+        INPUT_DIR: ${{ github.event.inputs.input_dir || 'data/input' }}
+        OUTPUT_DIR: ${{ github.event.inputs.output_dir || 'data/output' }}
+        ARCHIVE_DIR: ${{ github.event.inputs.archive_dir || 'data/archive' }}
+      run: python .github/scripts/pca_to_json.py
+    
+    - name: Upload JSON artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: processed-pca-files
+        path: ${{ github.event.inputs.output_dir || 'data/output' }}/*.json
+        retention-days: 90
+    
+    - name: Upload archived PCA files
+      uses: actions/upload-artifact@v3
+      with:
+        name: archived-pca-files
+        path: ${{ github.event.inputs.archive_dir || 'data/archive' }}/*.pca
+        retention-days: 90
