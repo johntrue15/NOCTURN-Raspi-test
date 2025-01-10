@@ -13,7 +13,7 @@ on:
       output_dir:
         description: 'Directory for JSON output'
         required: false
-        default: 'output'
+        default: 'data/output'
       archive_dir:
         description: 'Directory for processed PCA files'
         required: false
@@ -50,7 +50,7 @@ jobs:
       run: |
         git config --local user.email "github-actions[bot]@users.noreply.github.com"
         git config --local user.name "github-actions[bot]"
-        git add ${{ github.event.inputs.output_dir || 'output' }}/*.json
+        git add ${{ github.event.inputs.output_dir || 'data/output' }}/*.json
         git diff --quiet && git diff --staged --quiet || (git commit -m "Update JSON outputs from PCA processing [skip ci]" && git push)
     
     - name: Upload archived PCA files
