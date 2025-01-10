@@ -79,7 +79,8 @@ def main():
 
     input_file = sys.argv[1]
     input_path = Path(input_file)
-    output_path = Path('data/output') / f"{input_path.stem}.json"
+    # Include original extension in output filename
+    output_path = Path('data/output') / f"{input_path.stem}.pcj.json"
 
     # Ensure output directory exists
     output_path.parent.mkdir(parents=True, exist_ok=True)
