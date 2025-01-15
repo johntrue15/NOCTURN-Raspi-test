@@ -1,277 +1,205 @@
 #!/usr/bin/env python3
-import sys
 import json
 import re
+import os
+import sys
+from striprtf.striprtf import rtf_to_text
 from pathlib import Path
-import argparse
-from typing import Dict, Any, Optional, Tuple
 
-def extract_gain_map_value(key: str, data: Dict[str, Any]) -> str:
-    """Extract gain map value from the raw RTF data."""
-    # Find the corresponding raw value entry
-    value_key = next((k for k in data.keys() if f'_{key.split("_")[-1]}_dev_' in k), None)
-    if value_key:
-        # Extract the numeric value and timestamp
-        pattern = r'(\d+\.\d+)_dev_(\d+\.\d+).*?(\d{1,2}/\d{1,2}/\d{4}_\d{1,2}:\d{2}:\d{2}\s*[AP]M)'
-        match = re.search(pattern, value_key)
-        if match:
-            value, dev, timestamp = match.groups()
-            return f"{value}, dev {dev}, acquired {timestamp}"
-    return ""
+def clean_rtf_content(rtf_content):
+    """Convert RTF to plain text and clean up formatting."""
+    plain_text = rtf_to_text(rtf_content)
+    plain_text = re.sub(r'\\[a-z]+\d*', '', plain_text)
+    plain_text = re.sub(r'\{|\}', '', plain_text)
+    plain_text = re.sub(r'\s+', ' ', plain_text)
+    return plain_text
 
-def clean_key(key: str) -> str:
-    """Clean RTF formatting from key."""
-    # Remove RTF control sequences
-    key = re.sub(r'fs\d+intbl_ltrch_', '', key)
-    key = re.sub(r'bintbl_ltrch_', '', key)
-    key = re.sub(r'trow.*?ltrch_', '', key)
-    # Remove multiple underscores
-    key = re.sub(r'_{2,}', '_', key)
-    # Remove remaining special characters
-    key = re.sub(r'[^a-zA-Z0-9_/-]', '', key)
-    return key.strip('_').lower()
-
-def clean_value(value: str) -> str:
-    """Clean RTF formatting from value."""
-    # Remove RTF control codes and formatting
-    value = re.sub(r'\\[a-zA-Z]+\d*', '', value)
-    value = re.sub(r'[\\\{\}]', '', value)
-    value = re.sub(r'li\d+', '', value)
-    value = re.sub(r'ri\d+', '', value)
-    value = re.sub(r'sa\d+', '', value)
-    value = re.sub(r'sb\d+', '', value)
-    value = re.sub(r'fi\d+', '', value)
-    value = re.sub(r'ql', '', value)
-    value = re.sub(r'cell', '', value)
-    return value.strip()
-
-def extract_time_value(key: str, data: Dict[str, Any]) -> Optional[str]:
-    """Extract timestamp from data."""
-    time_pattern = r'(\d{1,2}/\d{1,2}/\d{4})_(\d{1,2}:\d{2}:\d{2}\s*[AP]M)'
-    if match := re.search(time_pattern, key):
-        date, time = match.groups()
-        return f"{date} {time}"
-    return None
-
-def extract_formula_data(key: str, data: Dict[str, Any]) -> Dict[str, str]:
-    """Extract name, expression and value for geometric unsharpness formulas."""
-    formula_data = {"name": "", "expression": "", "value": ""}
-    
-    # Convert the key to lowercase for case-insensitive matching
-    key_lower = key.lower()
-    
-    # Find corresponding expression and value entries
-    for k, v in data.items():
-        k_lower = k.lower()
-        if key_lower in k_lower:
-            if 'name' in k_lower:
-                formula_data['name'] = clean_value(v)
-            elif 'expression' in k_lower:
-                formula_data['expression'] = clean_value(v)
-            elif 'value' in k_lower:
-                formula_data['value'] = clean_value(v)
-                
-    return formula_data
-
-def get_formula_key(name: str) -> str:
-    """Convert formula name to dictionary key."""
-    name_lower = name.lower()
-    if 'iqi hole' in name_lower:
-        return 'iqi_hole'
-    elif 'x srb-pixels' in name_lower:
-        return 'x_srb_pixels'
-    elif 'y srb-pixels' in name_lower:
-        return 'y_srb_pixels'
-    elif 'min mag' in name_lower:
-        return 'min_mag'
-    elif 'im unsharpness' in name_lower:
-        return 'im_unsharpness'
-    return ''
-
-def structure_data(input_data: Dict[str, Any]) -> Dict[str, Any]:
-    """Structure the data into organized sections."""
-    structured = {
-        "machine": {
-            "id": "",
-            "serial": "",
-            "operator_id": "",
-            "datetime": ""
+def parse_rtf_to_dict(rtf_content):
+    """Parse RTF content into a structured dictionary."""
+    parsed_data = {}
+    sections = {
+        'Machine ID': r"Machine ID:\s*(.+)",
+        'Machine Serial': r"Machine Serial:\s*(.+)",
+        'Operator ID': r"Operator ID:\s*(.+)",
+        'Date/Time': r"Date/Time:\s*(.+)",
+        'Xray Source': {
+            'Name': r"Xray Source[\s\S]*?Name:\s*(.+?)(?=\n|$)",
+            'Voltage': r"Voltage:\s*(.+)",
+            'Current': r"Current:\s*(.+)",
+            'Focal spot size': r"Focal spot size:\s*(.+)"
         },
-        "xray_source": {
-            "name": "",
-            "voltage": "",
-            "current": "",
-            "focal_spot_size": ""
+        'Detector': {
+            'Name': r"Detector[\s\S]*?Name:\s*(.+?)(?=\n|$)",
+            'Pixel pitch': r"Pixel pitch:\s*(.+)",
+            'Gain': r"Gain:\s*(.+)",
+            'Binning': r"Binning:\s*(.+)",
+            'Framerate': r"Framerate:\s*(.+)",
+            'Flip': r"Flip:\s*(.+)",
+            'Rotation': r"Rotation:\s*(.+)",
+            'Crop': r"Crop:\s*(.+)",
+            'ROI': r"ROI:\s*(.+)",
+            'Defect map': r"Defect map:\s*(.+)",
+            'Offset map': r"Offset map:\s*(.+)",
+            'Gain map 0': r"Gain map 0:\s*(.+)",
+            'Gain map 1': r"Gain map 1:\s*(.+)",
+            'Gain map 2': r"Gain map 2:\s*(.+)",
+            'Gain map 3': r"Gain map 3:\s*(.+)",
+            'Gain map 4': r"Gain map 4:\s*(.+)"
         },
-        "detector": {
-            "name": "",
-            "pixel_pitch": "",
-            "gain": "",
-            "binning": "",
-            "framerate": "",
-            "flip": "",
-            "rotation": "",
-            "crop": "",
-            "roi": "",
-            "gain_maps": {},
-            "defect_map": "",
-            "offset_map": ""
+        'Distances': {
+            'Source to detector': r"Source to detector:\s*(.+)",
+            'Source to object': r"Source to object:\s*(.+)",
+            'Calculated Ug': r"Calculated Ug:\s*(.+)",
+            'Zoom factor': r"Zoom factor:\s*(.+)",
+            'Effective pixel pitch': r"Effective pixel pitch:\s*(.+)"
         },
-        "distances": {
-            "units": "",
-            "source_to_detector": "",
-            "source_to_object": "",
-            "calculated_ug": "",
-            "zoom_factor": "",
-            "effective_pixel_pitch": ""
+        'Motion Positions': {
+            'Table rotate': r"Table rotate:\s*(.+)",
+            'Table left/right': r"Table left/right:\s*(.+)",
+            'Table up/down': r"Table up/down:\s*(.+)",
+            'Detector up/down': r"Detector up/down:\s*(.+)",
+            'Table mag': r"Table mag:\s*(.+)",
+            'Detector mag': r"Detector mag:\s*(.+)",
+            'Detector left/right': r"Detector left/right:\s*(.+)"
         },
-        "geometric_unsharpness": {
-            "formulas": {
-                "iqi_hole": {
-                    "name": "",
-                    "expression": "",
-                    "value": ""
-                },
-                "x_srb_pixels": {
-                    "name": "",
-                    "expression": "",
-                    "value": ""
-                },
-                "y_srb_pixels": {
-                    "name": "",
-                    "expression": "",
-                    "value": ""
-                },
-                "min_mag": {
-                    "name": "",
-                    "expression": "",
-                    "value": ""
-                },
-                "im_unsharpness": {
-                    "name": "",
-                    "expression": "",
-                    "value": ""
-                }
-            }
+        'Setup': {
+            'Fixturing': r"Fixturing:\s*(.+)",
+            'Filter': r"Filter:\s*(.+)"
         },
-        "motion_positions": {
-            "table_rotate": "",
-            "table_left_right": "",
-            "table_up_down": "",
-            "detector_up_down": "",
-            "table_mag": "",
-            "detector_mag": "",
-            "detector_left_right": ""
-        },
-        "setup": {
-            "fixturing": "",
-            "filter": ""
-        },
-        "ct_scan": {
-            "project_name": "",
-            "project_folder": "",
-            "frames_averaged": "",
-            "skip_frames": "",
-            "monitor_xray_down": "",
-            "type": "",
-            "projections": "",
-            "start_time": "",
-            "end_time": "",
-            "duration": ""
+        'CT Scan': {
+            'Project name': r"Project name:\s*(.+)",
+            'Project folder': r"Project folder:\s*(.+)",
+            '# Frames averaged': r"# Frames averaged:\s*(.+)",
+            '# Skip frames': r"# Skip frames:\s*(.+)",
+            'Monitor xray down': r"Monitor xray down:\s*(.+)",
+            'Type': r"Type:\s*(.+)",
+            '# Projections': r"# Projections:\s*(.+)",
+            'Start': r"Start:\s*(.+)",
+            'End': r"End:\s*(.+)",
+            'Duration': r"Duration:\s*(.+)"
         }
     }
 
-    # Process machine data
-    machine_data = input_data.get('machine', {})
+    for key, pattern in sections.items():
+        if isinstance(pattern, dict):
+            parsed_data[key] = {}
+            for sub_key, sub_pattern in pattern.items():
+                match = re.search(sub_pattern, rtf_content, re.MULTILINE)
+                if match:
+                    parsed_data[key][sub_key] = match.group(1).strip()
+        else:
+            match = re.search(pattern, rtf_content, re.MULTILINE)
+            if match:
+                parsed_data[key] = match.group(1).strip()
+
+    return parsed_data
+
+def parse_geometric_formula(rtf_content):
+    """Parse the Geometric Unsharpness Custom Formula section."""
+    cleaned_text = clean_rtf_content(rtf_content)
     
-    # Process formulas
-    formula_names = ['IQI Hole', 'X Srb-Pixels', 'Y Srb-Pixels', 'Min Mag', 'Im Unsharpness']
-    for formula_name in formula_names:
-        formula_data = extract_formula_data(formula_name, machine_data)
-        if formula_data['name']:
-            formula_key = get_formula_key(formula_data['name'])
-            if formula_key:
-                structured['geometric_unsharpness']['formulas'][formula_key] = formula_data
+    section_match = re.search(
+        r"Geometric Unsharpness Custom Formula:.*?(?=Motion Positions:|$)",
+        cleaned_text,
+        re.DOTALL
+    )
     
-    for key in machine_data:
-        clean_k = clean_key(key)
+    if not section_match:
+        return {}
+    
+    section_text = section_match.group(0)
+    formulas = {}
+    
+    formula_blocks = re.finditer(
+        r"Name:\s*(.*?)(?:\s*\[.*?\])?\s*Expression:\s*(.*?)\s*Value:\s*(.*?)(?=Name:|$)",
+        section_text,
+        re.DOTALL
+    )
+    
+    def clean_pipes(text):
+        """Remove extra pipe characters and clean up the text."""
+        cleaned = text.replace('|', '')
+        cleaned = re.sub(r'\s+', ' ', cleaned)
+        return cleaned.strip()
+    
+    for block in formula_blocks:
+        name = block.group(1).strip()
+        name = re.sub(r'\s*\[.*?\]', '', name)
+        name = clean_pipes(name)
         
-        # Handle timestamps
-        if time_value := extract_time_value(key, machine_data):
-            structured['machine']['datetime'] = time_value
-            continue
-
-        # Handle gain maps
-        if 'gain_map_' in clean_k:
-            map_num = clean_k.split('_')[-1]
-            value = extract_gain_map_value(clean_k, input_data)
-            if value:
-                structured['detector']['gain_maps'][f'map_{map_num}'] = value
+        expression = clean_pipes(block.group(2).strip())
+        value = clean_pipes(block.group(3).strip())
+        
+        if not name or name.startswith('\\') or name.endswith('cell'):
             continue
             
-        # Handle defect map
-        if 'defect_map' in clean_k:
-            structured['detector']['defect_map'] = clean_value(machine_data[key])
-            continue
-            
-        # Handle offset map
-        if 'offset_map' in clean_k:
-            structured['detector']['offset_map'] = clean_value(machine_data[key])
-            continue
+        expression = expression.replace('Math.', '')
+        
+        formulas[name] = {
+            'Expression': expression,
+            'Value': value
+        }
+    
+    return formulas
 
-        # Map other values to appropriate sections
-        for section in structured:
-            if section in clean_k:
-                sub_key = clean_k.replace(f"{section}_", "")
-                if sub_key in structured[section]:
-                    structured[section][sub_key] = clean_value(machine_data[key])
-                break
-            elif clean_k in structured[section]:
-                structured[section][clean_k] = clean_value(machine_data[key])
-                break
-
-    # Remove empty sections and fields
-    return {k: {sk: sv for sk, sv in v.items() if sv} 
-            for k, v in structured.items() if any(sv for sv in v.values())}
-
-def process_rtf_file(input_file: Path, output_dir: Path) -> None:
-    """Process RTF-JSON file and save cleaned JSON."""
+def process_rtf_file(input_path):
+    """Process RTF file and create JSON output."""
     try:
-        # Read input file
-        with open(input_file, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-        
-        # Structure and clean the data
-        structured_data = structure_data(data)
-        
         # Create output directory if it doesn't exist
+        output_dir = Path('data/output')
         output_dir.mkdir(parents=True, exist_ok=True)
         
         # Generate output filename
-        output_file = output_dir / f"{input_file.stem}_cleaned.json"
+        input_file = Path(input_path)
+        output_file = output_dir / f"{input_file.stem}.json"
         
-        # Write JSON output
-        with open(output_file, 'w', encoding='utf-8') as f:
-            json.dump(structured_data, f, indent=2, ensure_ascii=False)
+        # Read and process the RTF file
+        with open(input_path, 'r', encoding='utf-8') as file:
+            rtf_content = file.read()
+
+        # Initial parsing
+        parsed_data = parse_rtf_to_dict(rtf_content)
+        
+        # Process Unicode characters
+        def process_unicode_in_dict(d):
+            for key, value in d.items():
+                if isinstance(value, dict):
+                    process_unicode_in_dict(value)
+                elif isinstance(value, str):
+                    if '\u00b5' in value:
+                        d[key] = value.replace('\u00b5', 'µ')
+            return d
+        
+        parsed_data = process_unicode_in_dict(parsed_data)
+        
+        # Parse geometric formulas
+        formulas = parse_geometric_formula(rtf_content)
+        parsed_data['Geometric Unsharpness Custom Formula'] = formulas
+        
+        # Save final parsed data
+        with open(output_file, 'w', encoding='utf-8') as json_file:
+            json.dump(parsed_data, json_file, indent=4, ensure_ascii=False)
             
-        print(f"Successfully processed {input_file} to {output_file}")
+        print(f"Successfully processed {input_path} to {output_file}")
+        return True
         
     except Exception as e:
-        print(f"Error processing {input_file}: {str(e)}", file=sys.stderr)
-        sys.exit(1)
+        print(f"Error processing {input_path}: {str(e)}", file=sys.stderr)
+        return False
 
 def main():
-    parser = argparse.ArgumentParser(description='Convert RTF-JSON files to cleaned JSON')
-    parser.add_argument('input_file', type=str, help='Input RTF-JSON file path')
-    parser.add_argument('--output-dir', type=str, default='data/output',
-                       help='Output directory for JSON files')
+    """Main entry point for the script."""
+    if len(sys.argv) != 2:
+        print("Usage: python rtf_to_json.py <input_rtf_file>", file=sys.stderr)
+        sys.exit(1)
     
-    args = parser.parse_args()
+    input_file = sys.argv[1]
+    if not os.path.exists(input_file):
+        print(f"Error: Input file '{input_file}' does not exist", file=sys.stderr)
+        sys.exit(1)
     
-    input_path = Path(args.input_file)
-    output_path = Path(args.output_dir)
-    
-    process_rtf_file(input_path, output_path)
+    success = process_rtf_file(input_file)
+    sys.exit(0 if success else 1)
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
