@@ -5,94 +5,153 @@ import re
 from pathlib import Path
 import argparse
 from typing import Dict, Any, List, Tuple
-from datetime import datetime
 
-def extract_table_data(rtf_content: str) -> Dict[str, Any]:
-    """Extract and structure data from RTF content."""
-    # Remove RTF control sequences
-    cleaned = re.sub(r'\\[a-zA-Z]+[-\d]*\s?', ' ', rtf_content)
+def clean_key(key: str) -> str:
+    """Clean and normalize key names."""
+    # Remove underscores and special characters
+    key = re.sub(r'_{2,}', '', key)  # Remove multiple underscores
+    key = re.sub(r'[^a-zA-Z0-9_/]', '', key)  # Keep only alphanumeric, underscore, and forward slash
     
+    # Handle special cases
+    key = re.sub(r'^_+|_+$', '', key)  # Remove leading/trailing underscores
+    key = re.sub(r'_+', '_', key)  # Replace multiple underscores with single
+    
+    return key.lower().strip()
+
+def clean_value(value: str) -> Any:
+    """Clean and normalize values."""
+    if not value or value == '00000':
+        return ""
+        
+    # Remove common artifacts
+    value = value.strip('| []{}\\')
+    value = re.sub(r'\s+', ' ', value).strip()
+    
+    # Try to convert numeric values
+    try:
+        if '.' in value and re.match(r'^[\d.]+$', value):
+            return float(value)
+        elif value.isdigit():
+            return int(value)
+    except ValueError:
+        pass
+        
+    return value
+
+def parse_rtf_table(content: str) -> Dict[str, Any]:
+    """Parse RTF table into structured data."""
     # Initialize structure
     data = {
-        "machine": {},
-        "xray_source": {},
-        "detector": {},
-        "distances": {},
-        "geometric_unsharpness": {},
-        "motion_positions": {},
-        "setup": {},
-        "ct_scan": {}
+        "machine": {
+            "id": "",
+            "serial": "",
+            "operator_id": "",
+            "datetime": ""
+        },
+        "xray_source": {
+            "name": "",
+            "voltage": "",
+            "current": "",
+            "focal_spot_size": ""
+        },
+        "detector": {
+            "name": "",
+            "pixel_pitch": "",
+            "gain": "",
+            "binning": "",
+            "framerate": "",
+            "flip": "",
+            "rotation": "",
+            "crop": "",
+            "roi": "",
+            "defect_map": "",
+            "offset_map": "",
+            "gain_maps": {}
+        },
+        "distances": {
+            "units": "",
+            "source_to_detector": "",
+            "source_to_object": "",
+            "calculated_ug": "",
+            "zoom_factor": "",
+            "effective_pixel_pitch": ""
+        },
+        "motion_positions": {
+            "table_rotate": "",
+            "table_left_right": "",
+            "table_up_down": "",
+            "detector_up_down": "",
+            "table_mag": "",
+            "detector_mag": "",
+            "detector_left_right": ""
+        },
+        "setup": {
+            "fixturing": "",
+            "filter": ""
+        },
+        "ct_scan": {
+            "project_name": "",
+            "project_folder": "",
+            "frames_averaged": "",
+            "skip_frames": "",
+            "monitor_xray_down": "",
+            "type": "",
+            "projections": "",
+            "start": "",
+            "end": "",
+            "duration": ""
+        }
     }
     
-    current_section = None
-    timestamp_buffer = {}
-    
     # Split into lines and process
-    lines = cleaned.split('\n')
+    lines = content.split('\n')
+    current_section = None
+    
     for line in lines:
         line = line.strip()
         if not line or line.startswith('+--'):
             continue
             
         # Handle section headers
-        if line.startswith('**') and line.endswith(':**'):
-            section = line.strip('*: ').lower()
+        if ':**' in line:
+            section = line.split(':**')[0].strip('*: ').lower()
             current_section = section.replace(' ', '_')
             continue
-        
+            
         # Process key-value pairs
         if ':' in line:
-            key, value = [part.strip() for part in line.split(':', 1)]
-            
-            # Clean key
-            key = key.lower()
-            key = re.sub(r'[^a-z0-9_/]', '', key.replace(' ', '_'))
-            
-            # Clean value
-            value = value.strip('| []{}\\')
-            value = re.sub(r'\s+', ' ', value).strip()
-            
-            # Handle empty or placeholder values
-            if not value or value == 'n/a' or value == '00000':
-                value = ""
-            
-            # Special handling for timestamps
-            if re.search(r'\d{1,2}/\d{1,2}/\d{4}', value):
-                timestamp_buffer['date'] = value
-                continue
-            if re.search(r'\d{1,2}:\d{2}:\d{2}\s*[AP]M', value):
-                timestamp_buffer['time'] = value
-                if 'date' in timestamp_buffer:
-                    value = f"{timestamp_buffer['date']} {value}"
-                    timestamp_buffer.clear()
-            
-            # Handle numeric values
-            if value and not isinstance(value, str):
-                try:
-                    if '.' in str(value):
-                        value = float(value)
-                    else:
-                        value = int(value)
-                except ValueError:
-                    pass
-            
-            # Map to appropriate section
-            if current_section:
-                if current_section in data:
-                    data[current_section][key] = value
-            else:
-                # Try to map to appropriate section based on key
-                mapped = False
-                for section in data.keys():
-                    if key.startswith(section):
-                        data[section][key.replace(f"{section}_", "")] = value
-                        mapped = True
-                        break
-                if not mapped:
-                    data["machine"][key] = value
+            parts = line.split(':', 1)
+            if len(parts) == 2:
+                key = clean_key(parts[0])
+                value = clean_value(parts[1])
+                
+                # Special handling for dates and times
+                if re.search(r'\d{1,2}/\d{1,2}/\d{4}', str(value)):
+                    if 'time' in key.lower():
+                        time_parts = value.split()
+                        if len(time_parts) > 1:
+                            value = f"{time_parts[0]} {time_parts[1]}"
+                
+                # Map to appropriate section based on key
+                if key.startswith('gain_map_'):
+                    map_num = key.split('_')[-1]
+                    data['detector']['gain_maps'][f'map_{map_num}'] = value
+                elif 'name' in key and current_section:
+                    data[current_section]['name'] = value
+                else:
+                    for section in data:
+                        if key in data[section]:
+                            data[section][key] = value
+                            break
+                        elif key.startswith(section):
+                            clean_subkey = key.replace(f"{section}_", "")
+                            if clean_subkey in data[section]:
+                                data[section][clean_subkey] = value
+                                break
     
-    # Clean up empty sections
-    return {k: v for k, v in data.items() if v}
+    # Remove empty sections and fields
+    return {k: {sk: sv for sk, sv in v.items() if sv} 
+            for k, v in data.items() if any(sv for sv in v.values())}
 
 def process_rtf_file(input_file: Path, output_dir: Path) -> None:
     """Process RTF file and save as clean JSON."""
@@ -101,8 +160,8 @@ def process_rtf_file(input_file: Path, output_dir: Path) -> None:
         with open(input_file, 'r', encoding='utf-8') as f:
             content = f.read()
         
-        # Extract and structure data
-        structured_data = extract_table_data(content)
+        # Parse and structure the data
+        structured_data = parse_rtf_table(content)
         
         # Create output directory if it doesn't exist
         output_dir.mkdir(parents=True, exist_ok=True)
