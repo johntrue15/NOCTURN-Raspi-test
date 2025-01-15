@@ -4,114 +4,95 @@ import json
 import re
 from pathlib import Path
 import argparse
-from typing import Dict, Any, Union, List, Tuple
+from typing import Dict, Any, List, Tuple
 from datetime import datetime
 
-def extract_table_data(rtf_content: str) -> List[Tuple[str, str]]:
-    """Extract key-value pairs from RTF table format."""
-    # Remove RTF control sequences and extra whitespace
-    cleaned = re.sub(r'\\[a-zA-Z]+[\d]*\s?', ' ', rtf_content)
-    cleaned = re.sub(r'\{|\}|\[|\]|\\|\|', ' ', cleaned)
+def extract_table_data(rtf_content: str) -> Dict[str, Any]:
+    """Extract and structure data from RTF content."""
+    # Remove RTF control sequences
+    cleaned = re.sub(r'\\[a-zA-Z]+[-\d]*\s?', ' ', rtf_content)
     
-    # Split into lines and clean up
-    lines = [line.strip() for line in cleaned.split('\n') if line.strip()]
+    # Initialize structure
+    data = {
+        "machine": {},
+        "xray_source": {},
+        "detector": {},
+        "distances": {},
+        "geometric_unsharpness": {},
+        "motion_positions": {},
+        "setup": {},
+        "ct_scan": {}
+    }
     
-    pairs = []
     current_section = None
+    timestamp_buffer = {}
     
+    # Split into lines and process
+    lines = cleaned.split('\n')
     for line in lines:
-        # Skip separator lines and empty lines
-        if line.startswith('+--') or not line.strip():
+        line = line.strip()
+        if not line or line.startswith('+--'):
             continue
             
-        # Check for section headers
+        # Handle section headers
         if line.startswith('**') and line.endswith(':**'):
-            current_section = line.strip('*: ')
+            section = line.strip('*: ').lower()
+            current_section = section.replace(' ', '_')
             continue
-            
-        # Look for key-value pairs
-        if ':' in line:
-            key, value = line.split(':', 1)
-            key = key.strip()
-            value = value.strip()
-            
-            # Add section prefix if we're in a section
-            if current_section:
-                key = f"{current_section}_{key}"
-            
-            pairs.append((key, value))
-    
-    return pairs
-
-def clean_key(key: str) -> str:
-    """Clean and normalize key names."""
-    # Remove any remaining RTF artifacts
-    key = re.sub(r'\s+', ' ', key)
-    key = key.strip()
-    # Convert spaces to underscores for JSON compatibility
-    key = re.sub(r'\s+', '_', key)
-    return key.lower()
-
-def clean_value(value: str) -> Union[str, float, int]:
-    """Clean and normalize values, converting to appropriate types."""
-    # Remove common RTF artifacts
-    value = re.sub(r'\s+', ' ', value)
-    value = value.strip()
-    
-    # Handle empty or placeholder values
-    if not value or value == 'n/a':
-        return ""
-    
-    # Try to convert numeric values
-    try:
-        if '.' in value:
-            return float(value)
-        elif value.isdigit():
-            return int(value)
-    except ValueError:
-        pass
-    
-    return value
-
-def parse_timestamp(value: str) -> str:
-    """Parse and standardize timestamp values."""
-    # Various timestamp patterns
-    timestamp_patterns = [
-        r'\d{1,2}/\d{1,2}/\d{4}\s+\d{1,2}:\d{2}:\d{2}\s*(?:AM|PM)',
-        r'\d{1,2}/\d{1,2}/\d{4}\s+\d{1,2}:\d{2}\s*(?:AM|PM)',
-    ]
-    
-    for pattern in timestamp_patterns:
-        match = re.search(pattern, value)
-        if match:
-            return match.group(0)
-    
-    return value
-
-def structure_data(pairs: List[Tuple[str, str]]) -> Dict[str, Any]:
-    """Convert pairs into structured JSON data."""
-    structured_data = {}
-    
-    for key, value in pairs:
-        clean_k = clean_key(key)
         
-        # Handle sections
-        if '_' in clean_k:
-            section, subkey = clean_k.split('_', 1)
-            if section not in structured_data:
-                structured_data[section] = {}
+        # Process key-value pairs
+        if ':' in line:
+            key, value = [part.strip() for part in line.split(':', 1)]
             
-            # Check if it's a timestamp
-            if any(time_word in subkey for time_word in ['date', 'time', 'start', 'end']):
-                cleaned_value = parse_timestamp(value)
+            # Clean key
+            key = key.lower()
+            key = re.sub(r'[^a-z0-9_/]', '', key.replace(' ', '_'))
+            
+            # Clean value
+            value = value.strip('| []{}\\')
+            value = re.sub(r'\s+', ' ', value).strip()
+            
+            # Handle empty or placeholder values
+            if not value or value == 'n/a' or value == '00000':
+                value = ""
+            
+            # Special handling for timestamps
+            if re.search(r'\d{1,2}/\d{1,2}/\d{4}', value):
+                timestamp_buffer['date'] = value
+                continue
+            if re.search(r'\d{1,2}:\d{2}:\d{2}\s*[AP]M', value):
+                timestamp_buffer['time'] = value
+                if 'date' in timestamp_buffer:
+                    value = f"{timestamp_buffer['date']} {value}"
+                    timestamp_buffer.clear()
+            
+            # Handle numeric values
+            if value and not isinstance(value, str):
+                try:
+                    if '.' in str(value):
+                        value = float(value)
+                    else:
+                        value = int(value)
+                except ValueError:
+                    pass
+            
+            # Map to appropriate section
+            if current_section:
+                if current_section in data:
+                    data[current_section][key] = value
             else:
-                cleaned_value = clean_value(value)
-                
-            structured_data[section][subkey] = cleaned_value
-        else:
-            structured_data[clean_k] = clean_value(value)
+                # Try to map to appropriate section based on key
+                mapped = False
+                for section in data.keys():
+                    if key.startswith(section):
+                        data[section][key.replace(f"{section}_", "")] = value
+                        mapped = True
+                        break
+                if not mapped:
+                    data["machine"][key] = value
     
-    return structured_data
+    # Clean up empty sections
+    return {k: v for k, v in data.items() if v}
 
 def process_rtf_file(input_file: Path, output_dir: Path) -> None:
     """Process RTF file and save as clean JSON."""
@@ -120,11 +101,8 @@ def process_rtf_file(input_file: Path, output_dir: Path) -> None:
         with open(input_file, 'r', encoding='utf-8') as f:
             content = f.read()
         
-        # Extract table data
-        pairs = extract_table_data(content)
-        
-        # Structure the data
-        structured_data = structure_data(pairs)
+        # Extract and structure data
+        structured_data = extract_table_data(content)
         
         # Create output directory if it doesn't exist
         output_dir.mkdir(parents=True, exist_ok=True)
