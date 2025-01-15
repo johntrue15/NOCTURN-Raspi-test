@@ -14,6 +14,24 @@ def clean_rtf_content(rtf_content):
     plain_text = re.sub(r'\s+', ' ', plain_text)
     return plain_text
 
+def clean_value(value):
+    """Clean up RTF artifacts from values."""
+    if not value:
+        return None
+    
+    # Remove common RTF control words
+    value = re.sub(r'\\[a-z]+', '', value)
+    # Remove extra spaces
+    value = re.sub(r'\s+', ' ', value)
+    # Clean value
+    value = value.strip()
+    
+    # Return None for empty or RTF-only content
+    if not value or value in ['cell', '']:
+        return None
+    
+    return value
+
 def parse_rtf_to_dict(rtf_content):
     """Parse RTF content into a structured dictionary."""
     parsed_data = {}
@@ -82,15 +100,21 @@ def parse_rtf_to_dict(rtf_content):
 
     for key, pattern in sections.items():
         if isinstance(pattern, dict):
-            parsed_data[key] = {}
+            section_data = {}
             for sub_key, sub_pattern in pattern.items():
                 match = re.search(sub_pattern, rtf_content, re.MULTILINE)
                 if match:
-                    parsed_data[key][sub_key] = match.group(1).strip()
+                    value = clean_value(match.group(1))
+                    if value is not None:
+                        section_data[sub_key] = value
+            if section_data:  # Only add non-empty sections
+                parsed_data[key] = section_data
         else:
             match = re.search(pattern, rtf_content, re.MULTILINE)
             if match:
-                parsed_data[key] = match.group(1).strip()
+                value = clean_value(match.group(1))
+                if value is not None:
+                    parsed_data[key] = value
 
     return parsed_data
 
@@ -144,6 +168,15 @@ def parse_geometric_formula(rtf_content):
 
 def process_rtf_file(input_path):
     """Process RTF file and create JSON output."""
+    def remove_empty_sections(d):
+        """Recursively remove empty dictionaries and None values."""
+        if not isinstance(d, dict):
+            return d
+        return {
+            k: remove_empty_sections(v)
+            for k, v in d.items()
+            if v is not None and (not isinstance(v, dict) or v)
+        }
     try:
         # Create output directory if it doesn't exist
         output_dir = Path('data/output')
@@ -160,15 +193,25 @@ def process_rtf_file(input_path):
         # Initial parsing
         parsed_data = parse_rtf_to_dict(rtf_content)
         
+        # Clean up the parsed data
+        parsed_data = remove_empty_sections(parsed_data)
+        
         # Process Unicode characters
         def process_unicode_in_dict(d):
+            if not isinstance(d, dict):
+                return d
+            result = {}
             for key, value in d.items():
                 if isinstance(value, dict):
-                    process_unicode_in_dict(value)
+                    result[key] = process_unicode_in_dict(value)
                 elif isinstance(value, str):
                     if '\u00b5' in value:
-                        d[key] = value.replace('\u00b5', 'µ')
-            return d
+                        result[key] = value.replace('\u00b5', 'µ')
+                    else:
+                        result[key] = value
+                else:
+                    result[key] = value
+            return result
         
         parsed_data = process_unicode_in_dict(parsed_data)
         
