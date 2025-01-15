@@ -1,0 +1,11 @@
+{
+  "detector": {
+    "gain_maps": {
+      "map_0": "li0",
+      "map_1": "li0",
+      "map_2": "li0",
+      "map_3": "li0",
+      "map_4": "li0"
+    }
+  }
+}
