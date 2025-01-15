@@ -4,105 +4,127 @@ import json
 import re
 from pathlib import Path
 import argparse
-from typing import Dict, Any, Union
+from typing import Dict, Any, Union, List, Tuple
 from datetime import datetime
+
+def extract_table_data(rtf_content: str) -> List[Tuple[str, str]]:
+    """Extract key-value pairs from RTF table format."""
+    # Remove RTF control sequences and extra whitespace
+    cleaned = re.sub(r'\\[a-zA-Z]+[\d]*\s?', ' ', rtf_content)
+    cleaned = re.sub(r'\{|\}|\[|\]|\\|\|', ' ', cleaned)
+    
+    # Split into lines and clean up
+    lines = [line.strip() for line in cleaned.split('\n') if line.strip()]
+    
+    pairs = []
+    current_section = None
+    
+    for line in lines:
+        # Skip separator lines and empty lines
+        if line.startswith('+--') or not line.strip():
+            continue
+            
+        # Check for section headers
+        if line.startswith('**') and line.endswith(':**'):
+            current_section = line.strip('*: ')
+            continue
+            
+        # Look for key-value pairs
+        if ':' in line:
+            key, value = line.split(':', 1)
+            key = key.strip()
+            value = value.strip()
+            
+            # Add section prefix if we're in a section
+            if current_section:
+                key = f"{current_section}_{key}"
+            
+            pairs.append((key, value))
+    
+    return pairs
 
 def clean_key(key: str) -> str:
     """Clean and normalize key names."""
-    # Remove numeric prefixes and common artifacts
-    key = re.sub(r'^[\d-]+', '', key)
-    key = re.sub(r'{\s*(\d+\s*)*{*\s*', '', key)
-    # Remove trailing numbers and special characters
-    key = re.sub(r'\d+$', '', key)
-    key = re.sub(r'[{}]', '', key)
-    return key.strip()
+    # Remove any remaining RTF artifacts
+    key = re.sub(r'\s+', ' ', key)
+    key = key.strip()
+    # Convert spaces to underscores for JSON compatibility
+    key = re.sub(r'\s+', '_', key)
+    return key.lower()
 
 def clean_value(value: str) -> Union[str, float, int]:
     """Clean and normalize values, converting to appropriate types."""
-    # Remove common artifacts
-    value = re.sub(r'^00000$', '', value)
-    value = re.sub(r'[{}]', '', value)
-    
-    # Try to convert to numeric if possible
+    # Remove common RTF artifacts
+    value = re.sub(r'\s+', ' ', value)
     value = value.strip()
+    
+    # Handle empty or placeholder values
+    if not value or value == 'n/a':
+        return ""
+    
+    # Try to convert numeric values
     try:
         if '.' in value:
             return float(value)
-        return int(value)
+        elif value.isdigit():
+            return int(value)
     except ValueError:
-        return value
-
-def parse_timestamp(key: str, value: str) -> str:
-    """Parse and format timestamp values."""
-    if any(time_key in key.lower() for time_key in ['date', 'time', 'start', 'end']):
-        # Handle split datetime values
-        if value.endswith('M}00000'):  # Time part
-            time_match = re.search(r'(\d{2}:\d{2}:\d{2}\s*[AP]M)', value)
-            if time_match:
-                return time_match.group(1)
-        elif re.match(r'\d{1,2}/\d{1,2}/\d{4}', value):
-            return value
+        pass
+    
     return value
 
-def merge_datetime_entries(data: Dict[str, Any]) -> Dict[str, Any]:
-    """Merge split date and time entries."""
-    result = {}
-    date_pattern = re.compile(r'(\d{1,2}/\d{1,2}/\d{4})\s*$')
-    time_pattern = re.compile(r'(\d{2}:\d{2}:\d{2}\s*[AP]M)')
+def parse_timestamp(value: str) -> str:
+    """Parse and standardize timestamp values."""
+    # Various timestamp patterns
+    timestamp_patterns = [
+        r'\d{1,2}/\d{1,2}/\d{4}\s+\d{1,2}:\d{2}:\d{2}\s*(?:AM|PM)',
+        r'\d{1,2}/\d{1,2}/\d{4}\s+\d{1,2}:\d{2}\s*(?:AM|PM)',
+    ]
     
-    temp_date = None
-    for key, value in data.items():
-        if isinstance(value, str):
-            date_match = date_pattern.search(value)
-            time_match = time_pattern.search(value)
-            
-            if date_match and time_match:
-                result[key] = f"{date_match.group(1)} {time_match.group(1)}"
-            elif date_match:
-                temp_date = date_match.group(1)
-            elif time_match and temp_date:
-                result[key] = f"{temp_date} {time_match.group(1)}"
-            else:
-                result[key] = value
-        else:
-            result[key] = value
+    for pattern in timestamp_patterns:
+        match = re.search(pattern, value)
+        if match:
+            return match.group(0)
     
-    return result
+    return value
 
-def structure_sections(data: Dict[str, Any]) -> Dict[str, Any]:
-    """Organize data into proper sections."""
+def structure_data(pairs: List[Tuple[str, str]]) -> Dict[str, Any]:
+    """Convert pairs into structured JSON data."""
     structured_data = {}
-    current_section = None
     
-    for key, value in data.items():
+    for key, value in pairs:
         clean_k = clean_key(key)
         
-        # Check if this is a section header
-        if value == "00000" and not any(char.isdigit() for char in clean_k):
-            current_section = clean_k
-            structured_data[current_section] = {}
-        else:
-            if current_section and clean_k != current_section:
-                structured_data[current_section][clean_k] = clean_value(value)
+        # Handle sections
+        if '_' in clean_k:
+            section, subkey = clean_k.split('_', 1)
+            if section not in structured_data:
+                structured_data[section] = {}
+            
+            # Check if it's a timestamp
+            if any(time_word in subkey for time_word in ['date', 'time', 'start', 'end']):
+                cleaned_value = parse_timestamp(value)
             else:
-                structured_data[clean_k] = clean_value(value)
+                cleaned_value = clean_value(value)
+                
+            structured_data[section][subkey] = cleaned_value
+        else:
+            structured_data[clean_k] = clean_value(value)
     
     return structured_data
 
 def process_rtf_file(input_file: Path, output_dir: Path) -> None:
     """Process RTF file and save as clean JSON."""
     try:
-        # Read input file
+        # Read RTF file
         with open(input_file, 'r', encoding='utf-8') as f:
             content = f.read()
-            
-        # Parse initial JSON
-        data = json.loads(content)
         
-        # Clean and structure the data
-        cleaned_data = {clean_key(k): v for k, v in data.items()}
-        merged_data = merge_datetime_entries(cleaned_data)
-        structured_data = structure_sections(merged_data)
+        # Extract table data
+        pairs = extract_table_data(content)
+        
+        # Structure the data
+        structured_data = structure_data(pairs)
         
         # Create output directory if it doesn't exist
         output_dir.mkdir(parents=True, exist_ok=True)
