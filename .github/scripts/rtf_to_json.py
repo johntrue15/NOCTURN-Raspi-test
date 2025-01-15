@@ -7,106 +7,165 @@ import argparse
 from typing import Dict, Any, List, Tuple
 from datetime import datetime
 
-def clean_rtf_key(key: str) -> str:
-    """Clean RTF control codes from key names."""
-    # Remove RTF formatting codes and table instructions
-    key = re.sub(r'trow.*?ltrch_', '', key)
-    key = re.sub(r'fs\d+intbl_', '', key)
-    key = re.sub(r'bintbl_', '', key)
-    key = re.sub(r'\\.*?\\', '', key)
+def extract_table_data(rtf_content: str) -> List[Tuple[str, str]]:
+    """Extract data from RTF table format."""
+    data_pairs = []
+    current_section = None
     
-    # Remove remaining special characters
+    # Split into lines and process
+    lines = rtf_content.split('\n')
+    for line in lines:
+        line = line.strip()
+        
+        # Skip empty lines and table formatting
+        if not line or line.startswith('+--'):
+            continue
+            
+        # Handle section headers
+        if '**' in line and ':**' in line:
+            current_section = line.strip('*: ').lower()
+            continue
+            
+        # Look for key-value pairs (separated by colon)
+        if ':' in line:
+            key, value = line.split(':', 1)
+            
+            # Clean key and value
+            key = key.strip()
+            value = value.strip()
+            
+            # Add section prefix if we're in a section
+            if current_section:
+                key = f"{current_section}_{key}"
+            
+            data_pairs.append((key, value))
+    
+    return data_pairs
+
+def clean_key(key: str) -> str:
+    """Clean and normalize key names."""
+    # Remove RTF control codes
+    key = re.sub(r'\\[a-zA-Z]+[\d]*\s?', '', key)
+    
+    # Remove special characters
     key = re.sub(r'[^a-zA-Z0-9_/\s-]', '', key)
     
-    # Convert spaces to underscores and clean up
+    # Convert spaces and normalize
     key = key.strip().lower().replace(' ', '_')
     key = re.sub(r'_{2,}', '_', key)
     
     return key
 
-def clean_rtf_value(value: str) -> str:
-    """Clean RTF control codes from values."""
-    # Remove RTF control sequences
-    value = re.sub(r'\\[a-zA-Z]+\d*', '', value)
-    value = re.sub(r'{.*?}', '', value)
-    value = re.sub(r'\\', '', value)
+def clean_value(value: str) -> Any:
+    """Clean and normalize values."""
+    # Remove RTF codes and formatting
+    value = value.strip('| []{}\\')
+    value = re.sub(r'\\[a-zA-Z]+[\d]*\s?', '', value)
+    value = value.strip()
     
-    # Remove cell formatting
-    value = re.sub(r'li\d+', '', value)
-    value = re.sub(r'ri\d+', '', value)
-    value = re.sub(r'sa\d+', '', value)
-    value = re.sub(r'sb\d+', '', value)
-    value = re.sub(r'fi\d+', '', value)
-    value = re.sub(r'ql', '', value)
-    value = re.sub(r'cell', '', value)
-    
-    return value.strip()
+    # Handle empty or placeholder values
+    if not value or value == 'n/a' or value == '00000':
+        return ""
+        
+    # Convert numeric values if possible
+    try:
+        if '.' in value and re.match(r'^[\d.]+$', value):
+            return float(value)
+        elif value.isdigit():
+            return int(value)
+    except ValueError:
+        pass
+        
+    return value
 
-def parse_rtf_table(content: str) -> Dict[str, Any]:
-    """Parse RTF table content into structured data."""
+def structure_data(pairs: List[Tuple[str, str]]) -> Dict[str, Any]:
+    """Organize data into structured sections."""
     data = {
-        "machine": {},
-        "xray_source": {},
-        "detector": {},
-        "distances": {},
-        "motion_positions": {},
-        "setup": {},
-        "ct_scan": {}
+        "machine": {
+            "id": "",
+            "serial": "",
+            "operator": "",
+            "datetime": ""
+        },
+        "xray_source": {
+            "name": "",
+            "voltage": "",
+            "current": "",
+            "focal_spot_size": ""
+        },
+        "detector": {
+            "name": "",
+            "pixel_pitch": "",
+            "gain": "",
+            "binning": "",
+            "framerate": "",
+            "flip": "",
+            "rotation": "",
+            "crop": "",
+            "roi": "",
+            "gain_maps": {}
+        },
+        "distances": {
+            "units": "",
+            "source_to_detector": "",
+            "source_to_object": "",
+            "calculated_ug": "",
+            "zoom_factor": "",
+            "effective_pixel_pitch": ""
+        },
+        "motion_positions": {
+            "table_rotate": "",
+            "table_left_right": "",
+            "table_up_down": "",
+            "detector_up_down": "",
+            "table_mag": "",
+            "detector_mag": "",
+            "detector_left_right": ""
+        },
+        "setup": {
+            "fixturing": "",
+            "filter": ""
+        },
+        "ct_scan": {
+            "project_name": "",
+            "project_folder": "",
+            "frames_averaged": "",
+            "skip_frames": "",
+            "monitor_xray_down": "",
+            "type": "",
+            "projections": "",
+            "start_time": "",
+            "end_time": "",
+            "duration": ""
+        }
     }
     
-    # Parse JSON first to get the RTF structure
-    try:
-        rtf_data = json.loads(content)
-    except json.JSONDecodeError as e:
-        print(f"Error parsing JSON: {str(e)}")
-        return data
+    # Process each key-value pair
+    for key, value in pairs:
+        clean_k = clean_key(key)
+        clean_v = clean_value(value)
         
-    current_section = None
-    
-    for key, value in rtf_data.get("machine", {}).items():
-        clean_key = clean_rtf_key(key)
-        clean_value = clean_rtf_value(value)
-        
-        # Skip empty values
-        if not clean_value:
+        # Handle gain maps separately
+        if 'gain_map_' in clean_k:
+            map_num = clean_k.split('_')[-1]
+            if clean_v:  # Only add non-empty values
+                data['detector']['gain_maps'][f'map_{map_num}'] = clean_v
             continue
             
-        # Handle datetime parts
-        if re.search(r'\d{1,2}/\d{1,2}/\d{4}', clean_key):
-            if 'datetime' not in data['machine']:
-                data['machine']['datetime'] = []
-            data['machine']['datetime'].append(clean_value)
-            continue
-            
-        # Map to appropriate section
-        section_mapping = {
-            'xray': 'xray_source',
-            'detector': 'detector',
-            'distance': 'distances',
-            'motion': 'motion_positions',
-            'setup': 'setup',
-            'ct': 'ct_scan'
-        }
-        
-        mapped = False
-        for prefix, section in section_mapping.items():
-            if prefix in clean_key:
-                # Remove section prefix from key
-                sub_key = clean_key.replace(f"{prefix}_", "").replace(prefix, "")
-                data[section][sub_key] = clean_value
-                mapped = True
+        # Map data to appropriate sections
+        for section in data:
+            if section in clean_k:
+                sub_key = clean_k.replace(f"{section}_", "")
+                if sub_key in data[section]:
+                    data[section][sub_key] = clean_v
                 break
-                
-        if not mapped:
-            # Add to machine section by default
-            data['machine'][clean_key] = clean_value
+            elif clean_k in data[section]:
+                data[section][clean_k] = clean_v
+                break
     
-    # Merge datetime entries
-    if 'datetime' in data['machine'] and isinstance(data['machine']['datetime'], list):
-        data['machine']['datetime'] = ' '.join(data['machine']['datetime'])
-    
-    # Remove empty sections
-    return {k: v for k, v in data.items() if v}
+    # Remove empty sections and fields
+    return {k: {sk: sv for sk, sv in v.items() if sv} 
+            for k, v in data.items() if any(sv for sv in v.values())}
 
 def process_rtf_file(input_file: Path, output_dir: Path) -> None:
     """Process RTF file and save as clean JSON."""
@@ -115,8 +174,11 @@ def process_rtf_file(input_file: Path, output_dir: Path) -> None:
         with open(input_file, 'r', encoding='utf-8') as f:
             content = f.read()
         
-        # Parse the content
-        structured_data = parse_rtf_table(content)
+        # Extract data pairs
+        data_pairs = extract_table_data(content)
+        
+        # Structure the data
+        structured_data = structure_data(data_pairs)
         
         # Create output directory if it doesn't exist
         output_dir.mkdir(parents=True, exist_ok=True)
