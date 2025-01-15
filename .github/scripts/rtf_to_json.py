@@ -4,12 +4,12 @@ import json
 import re
 from pathlib import Path
 import argparse
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Tuple
 
 def extract_gain_map_value(key: str, data: Dict[str, Any]) -> str:
     """Extract gain map value from the raw RTF data."""
     # Find the corresponding raw value entry
-    value_key = next((k for k in data['machine'].keys() if f'_{key.split("_")[-1]}_dev_' in k), None)
+    value_key = next((k for k in data.keys() if f'_{key.split("_")[-1]}_dev_' in k), None)
     if value_key:
         # Extract the numeric value and timestamp
         pattern = r'(\d+\.\d+)_dev_(\d+\.\d+).*?(\d{1,2}/\d{1,2}/\d{4}_\d{1,2}:\d{2}:\d{2}\s*[AP]M)'
@@ -53,6 +53,41 @@ def extract_time_value(key: str, data: Dict[str, Any]) -> Optional[str]:
         return f"{date} {time}"
     return None
 
+def extract_formula_data(key: str, data: Dict[str, Any]) -> Dict[str, str]:
+    """Extract name, expression and value for geometric unsharpness formulas."""
+    formula_data = {"name": "", "expression": "", "value": ""}
+    
+    # Convert the key to lowercase for case-insensitive matching
+    key_lower = key.lower()
+    
+    # Find corresponding expression and value entries
+    for k, v in data.items():
+        k_lower = k.lower()
+        if key_lower in k_lower:
+            if 'name' in k_lower:
+                formula_data['name'] = clean_value(v)
+            elif 'expression' in k_lower:
+                formula_data['expression'] = clean_value(v)
+            elif 'value' in k_lower:
+                formula_data['value'] = clean_value(v)
+                
+    return formula_data
+
+def get_formula_key(name: str) -> str:
+    """Convert formula name to dictionary key."""
+    name_lower = name.lower()
+    if 'iqi hole' in name_lower:
+        return 'iqi_hole'
+    elif 'x srb-pixels' in name_lower:
+        return 'x_srb_pixels'
+    elif 'y srb-pixels' in name_lower:
+        return 'y_srb_pixels'
+    elif 'min mag' in name_lower:
+        return 'min_mag'
+    elif 'im unsharpness' in name_lower:
+        return 'im_unsharpness'
+    return ''
+
 def structure_data(input_data: Dict[str, Any]) -> Dict[str, Any]:
     """Structure the data into organized sections."""
     structured = {
@@ -78,7 +113,9 @@ def structure_data(input_data: Dict[str, Any]) -> Dict[str, Any]:
             "rotation": "",
             "crop": "",
             "roi": "",
-            "gain_maps": {}
+            "gain_maps": {},
+            "defect_map": "",
+            "offset_map": ""
         },
         "distances": {
             "units": "",
@@ -87,6 +124,35 @@ def structure_data(input_data: Dict[str, Any]) -> Dict[str, Any]:
             "calculated_ug": "",
             "zoom_factor": "",
             "effective_pixel_pitch": ""
+        },
+        "geometric_unsharpness": {
+            "formulas": {
+                "iqi_hole": {
+                    "name": "",
+                    "expression": "",
+                    "value": ""
+                },
+                "x_srb_pixels": {
+                    "name": "",
+                    "expression": "",
+                    "value": ""
+                },
+                "y_srb_pixels": {
+                    "name": "",
+                    "expression": "",
+                    "value": ""
+                },
+                "min_mag": {
+                    "name": "",
+                    "expression": "",
+                    "value": ""
+                },
+                "im_unsharpness": {
+                    "name": "",
+                    "expression": "",
+                    "value": ""
+                }
+            }
         },
         "motion_positions": {
             "table_rotate": "",
@@ -117,6 +183,16 @@ def structure_data(input_data: Dict[str, Any]) -> Dict[str, Any]:
 
     # Process machine data
     machine_data = input_data.get('machine', {})
+    
+    # Process formulas
+    formula_names = ['IQI Hole', 'X Srb-Pixels', 'Y Srb-Pixels', 'Min Mag', 'Im Unsharpness']
+    for formula_name in formula_names:
+        formula_data = extract_formula_data(formula_name, machine_data)
+        if formula_data['name']:
+            formula_key = get_formula_key(formula_data['name'])
+            if formula_key:
+                structured['geometric_unsharpness']['formulas'][formula_key] = formula_data
+    
     for key in machine_data:
         clean_k = clean_key(key)
         
@@ -131,6 +207,16 @@ def structure_data(input_data: Dict[str, Any]) -> Dict[str, Any]:
             value = extract_gain_map_value(clean_k, input_data)
             if value:
                 structured['detector']['gain_maps'][f'map_{map_num}'] = value
+            continue
+            
+        # Handle defect map
+        if 'defect_map' in clean_k:
+            structured['detector']['defect_map'] = clean_value(machine_data[key])
+            continue
+            
+        # Handle offset map
+        if 'offset_map' in clean_k:
+            structured['detector']['offset_map'] = clean_value(machine_data[key])
             continue
 
         # Map other values to appropriate sections
