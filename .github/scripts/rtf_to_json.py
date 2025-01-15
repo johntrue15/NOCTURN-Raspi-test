@@ -6,150 +6,101 @@ from pathlib import Path
 import argparse
 from typing import Dict, Any, List, Tuple
 
-def clean_key(key: str) -> str:
-    """Clean and normalize key names."""
-    # Remove underscores and special characters
-    key = re.sub(r'_{2,}', '', key)  # Remove multiple underscores
-    key = re.sub(r'[^a-zA-Z0-9_/]', '', key)  # Keep only alphanumeric, underscore, and forward slash
-    
-    # Handle special cases
-    key = re.sub(r'^_+|_+$', '', key)  # Remove leading/trailing underscores
-    key = re.sub(r'_+', '_', key)  # Replace multiple underscores with single
-    
-    return key.lower().strip()
-
-def clean_value(value: str) -> Any:
-    """Clean and normalize values."""
-    if not value or value == '00000':
-        return ""
+def extract_key_value(line: str) -> Tuple[str, str]:
+    """Extract clean key-value pair from a line."""
+    # Skip table formatting lines
+    if line.startswith('+--') or not line.strip():
+        return None, None
         
-    # Remove common artifacts
+    # Split on colon if present
+    parts = line.split(':', 1)
+    if len(parts) != 2:
+        return None, None
+        
+    key = parts[0].strip()
+    value = parts[1].strip()
+    
+    # Clean key
+    key = re.sub(r'[^a-zA-Z0-9\s/_]', '', key)  # Remove special chars except spaces and /
+    key = re.sub(r'\s+', '_', key)  # Replace spaces with single underscore
+    key = key.lower()  # Convert to lowercase
+    
+    # Clean value
     value = value.strip('| []{}\\')
     value = re.sub(r'\s+', ' ', value).strip()
     
-    # Try to convert numeric values
-    try:
-        if '.' in value and re.match(r'^[\d.]+$', value):
-            return float(value)
-        elif value.isdigit():
-            return int(value)
-    except ValueError:
-        pass
-        
-    return value
+    return key, value
 
-def parse_rtf_table(content: str) -> Dict[str, Any]:
-    """Parse RTF table into structured data."""
-    # Initialize structure
+def parse_rtf_content(content: str) -> Dict[str, Any]:
+    """Parse RTF content into structured data."""
     data = {
-        "machine": {
-            "id": "",
-            "serial": "",
-            "operator_id": "",
-            "datetime": ""
-        },
-        "xray_source": {
-            "name": "",
-            "voltage": "",
-            "current": "",
-            "focal_spot_size": ""
-        },
-        "detector": {
-            "name": "",
-            "pixel_pitch": "",
-            "gain": "",
-            "binning": "",
-            "framerate": "",
-            "flip": "",
-            "rotation": "",
-            "crop": "",
-            "roi": "",
-            "defect_map": "",
-            "offset_map": "",
-            "gain_maps": {}
-        },
-        "distances": {
-            "units": "",
-            "source_to_detector": "",
-            "source_to_object": "",
-            "calculated_ug": "",
-            "zoom_factor": "",
-            "effective_pixel_pitch": ""
-        },
-        "motion_positions": {
-            "table_rotate": "",
-            "table_left_right": "",
-            "table_up_down": "",
-            "detector_up_down": "",
-            "table_mag": "",
-            "detector_mag": "",
-            "detector_left_right": ""
-        },
-        "setup": {
-            "fixturing": "",
-            "filter": ""
-        },
-        "ct_scan": {
-            "project_name": "",
-            "project_folder": "",
-            "frames_averaged": "",
-            "skip_frames": "",
-            "monitor_xray_down": "",
-            "type": "",
-            "projections": "",
-            "start": "",
-            "end": "",
-            "duration": ""
-        }
+        "machine": {},
+        "xray_source": {},
+        "detector": {},
+        "distances": {},
+        "motion_positions": {},
+        "setup": {},
+        "ct_scan": {}
     }
     
-    # Split into lines and process
-    lines = content.split('\n')
     current_section = None
+    lines = content.split('\n')
+    datetime_parts = []
     
     for line in lines:
         line = line.strip()
+        
+        # Skip empty lines and table borders
         if not line or line.startswith('+--'):
             continue
             
         # Handle section headers
-        if ':**' in line:
-            section = line.split(':**')[0].strip('*: ').lower()
+        if line.startswith('**') and line.endswith(':**'):
+            section = line.strip('*: ').lower()
             current_section = section.replace(' ', '_')
             continue
             
-        # Process key-value pairs
-        if ':' in line:
-            parts = line.split(':', 1)
-            if len(parts) == 2:
-                key = clean_key(parts[0])
-                value = clean_value(parts[1])
+        # Extract key-value pair
+        key, value = extract_key_value(line)
+        if not key:
+            continue
+            
+        # Handle datetime components
+        if re.search(r'\d{1,2}/\d{1,2}/\d{4}', value):
+            datetime_parts.append(value)
+        elif re.search(r'\d{1,2}:\d{2}:\d{2}\s*[AP]M', value):
+            if datetime_parts:
+                value = f"{datetime_parts[-1]} {value}"
                 
-                # Special handling for dates and times
-                if re.search(r'\d{1,2}/\d{1,2}/\d{4}', str(value)):
-                    if 'time' in key.lower():
-                        time_parts = value.split()
-                        if len(time_parts) > 1:
-                            value = f"{time_parts[0]} {time_parts[1]}"
-                
-                # Map to appropriate section based on key
-                if key.startswith('gain_map_'):
-                    map_num = key.split('_')[-1]
-                    data['detector']['gain_maps'][f'map_{map_num}'] = value
-                elif 'name' in key and current_section:
-                    data[current_section]['name'] = value
-                else:
-                    for section in data:
-                        if key in data[section]:
-                            data[section][key] = value
-                            break
-                        elif key.startswith(section):
-                            clean_subkey = key.replace(f"{section}_", "")
-                            if clean_subkey in data[section]:
-                                data[section][clean_subkey] = value
-                                break
+        # Handle special fields
+        if key.startswith('gain_map_'):
+            if 'gain_maps' not in data['detector']:
+                data['detector']['gain_maps'] = {}
+            map_num = key.split('_')[-1]
+            # Combine the timestamp with the gain map value if present
+            if value.endswith('AM)') or value.endswith('PM)'):
+                prev_line = [l for l in lines if l.strip().startswith('___') and 'dev' in l]
+                if prev_line:
+                    value = f"{prev_line[0].split('___')[1].strip()}, {value}"
+            data['detector']['gain_maps'][f'map_{map_num}'] = value
+            continue
+            
+        # Map to appropriate section
+        if current_section in data:
+            data[current_section][key] = value
+        else:
+            # Try to map based on key prefix
+            mapped = False
+            for section in data:
+                if key.startswith(section):
+                    cleaned_key = key.replace(f"{section}_", "")
+                    data[section][cleaned_key] = value
+                    mapped = True
+                    break
+            if not mapped:
+                data["machine"][key] = value
     
-    # Remove empty sections and fields
+    # Clean up empty sections and fields
     return {k: {sk: sv for sk, sv in v.items() if sv} 
             for k, v in data.items() if any(sv for sv in v.values())}
 
@@ -160,8 +111,8 @@ def process_rtf_file(input_file: Path, output_dir: Path) -> None:
         with open(input_file, 'r', encoding='utf-8') as f:
             content = f.read()
         
-        # Parse and structure the data
-        structured_data = parse_rtf_table(content)
+        # Parse the content
+        structured_data = parse_rtf_content(content)
         
         # Create output directory if it doesn't exist
         output_dir.mkdir(parents=True, exist_ok=True)
