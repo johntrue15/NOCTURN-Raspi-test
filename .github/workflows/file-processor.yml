@@ -1,10 +1,8 @@
 name: File Processor
-
 on:
   push:
     paths:
       - 'data/input/**'
-
 jobs:
   process-files:
     runs-on: ubuntu-latest
@@ -32,6 +30,10 @@ jobs:
           if [[ -f "$file" ]]; then
             ext="${file##*.}"
             case "$ext" in
+              "rtf")
+                echo "Processing RTF file: $file"
+                python .github/scripts/rtf_to_json.py "$file"
+                ;;
               "pca")
                 echo "Processing PCA file: $file"
                 python .github/scripts/pca_to_json.py "$file"
