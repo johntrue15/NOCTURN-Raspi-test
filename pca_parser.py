@@ -6,7 +6,7 @@ import os
 import shutil
 import urllib.parse
 import logging
-from git import Repo
+from git import Repo, InvalidGitRepositoryError, NoSuchPathError
 
 # Configure logging
 logging.basicConfig(
@@ -42,52 +42,47 @@ def read_config():
     for dir_key in ["INPUT_DIR", "OUTPUT_DIR", "ARCHIVE_DIR", "GIT_LOCAL_REPO_DIR"]:
         directory = settings[dir_key]
         if not os.path.exists(directory):
-            logger.error(f"Directory does not exist: {directory}")
-            raise FileNotFoundError(f"Required directory does not exist: {directory}")
+            logger.info(f"Creating directory: {directory}")
+            os.makedirs(directory, exist_ok=True)
 
     return settings
 
 def init_or_update_repo(repo_dir, repo_url, branch, username, token):
-    """Initialize or update the Git repository."""
+    """Initialize or update the Git repository with authentication for push access."""
     try:
-        # Prepare the URL with credentials if provided
-        if username and token:
-            protocol_removed = repo_url.replace("https://", "")
-            username_encoded = urllib.parse.quote(username, safe="")
-            token_encoded = urllib.parse.quote(token, safe="")
-            repo_url_with_creds = f"https://{username_encoded}:{token_encoded}@{protocol_removed}"
+        # Format URL with token
+        if token:
+            remote_url = repo_url.replace('https://', f'https://git:{token}@')
         else:
-            repo_url_with_creds = repo_url
+            remote_url = repo_url
 
-        # Remove directory if it exists but is not a valid repo
         if os.path.exists(repo_dir):
             try:
                 repo = Repo(repo_dir)
-                logger.info(f"Found existing repo at {repo_dir}. Pulling latest changes...")
-                origin = repo.remotes.origin
-                if username and token:
-                    old_url = origin.url.replace("https://", "")
-                    new_url = f"https://{username_encoded}:{token_encoded}@{old_url}"
-                    origin.set_url(new_url)
-                origin.pull(branch)
+                logger.info(f"Found existing repo at {repo_dir}. Updating...")
+                
+                # Update remote URL with correct token format
+                origin = repo.remote('origin')
+                origin.set_url(remote_url)
+                
+                # Fetch and reset to match origin
+                repo.git.fetch('--all')
+                repo.git.reset('--hard', f'origin/{branch}')
                 logger.info("Repository updated successfully")
+                
             except (InvalidGitRepositoryError, NoSuchPathError):
-                logger.info(f"Removing invalid repository at {repo_dir}")
+                logger.info(f"Invalid repository at {repo_dir}, recreating...")
                 shutil.rmtree(repo_dir)
                 os.makedirs(repo_dir, exist_ok=True)
-                logger.info(f"Cloning repository from {repo_url} into {repo_dir}...")
-                Repo.clone_from(repo_url_with_creds, repo_dir, branch=branch)
+                Repo.clone_from(remote_url, repo_dir, branch=branch)
                 logger.info("Repository cloned successfully")
         else:
-            # Fresh clone
             os.makedirs(repo_dir, exist_ok=True)
-            logger.info(f"Cloning repository from {repo_url} into {repo_dir}...")
-            Repo.clone_from(repo_url_with_creds, repo_dir, branch=branch)
+            Repo.clone_from(remote_url, repo_dir, branch=branch)
             logger.info("Repository cloned successfully")
 
     except Exception as e:
         logger.error(f"Git operation failed: {str(e)}")
-        # If we catch any error during the process, clean up the directory
         if os.path.exists(repo_dir):
             shutil.rmtree(repo_dir)
             os.makedirs(repo_dir)
@@ -98,38 +93,33 @@ def commit_and_push_changes(repo_dir, commit_message, branch, username, token):
     try:
         repo = Repo(repo_dir)
         
-        # Ensure we're on the correct branch
-        if repo.active_branch.name != branch:
-            logger.info(f"Checking out branch '{branch}'...")
-            repo.git.checkout(branch)
-
         # Add all changes
         repo.git.add(A=True)
-
+        
+        # Only commit if there are changes
         if repo.is_dirty(untracked_files=True):
             logger.info("Committing changes...")
             repo.index.commit(commit_message)
-
-            # Update remote URL with credentials if provided
-            if username and token:
-                origin = repo.remote("origin")
-                old_url = origin.url.replace("https://", "")
-                username_encoded = urllib.parse.quote(username, safe="")
-                token_encoded = urllib.parse.quote(token, safe="")
-                new_url = f"https://{username_encoded}:{token_encoded}@{old_url}"
-                origin.set_url(new_url)
-
+            
+            # Update remote URL with token if provided
+            if token:
+                origin = repo.remote('origin')
+                current_url = origin.url
+                remote_url = current_url.replace('https://', f'https://git:{token}@')
+                origin.set_url(remote_url)
+            
             logger.info("Pushing changes to remote...")
-            repo.remotes.origin.push(branch)
+            repo.git.push('origin', branch)
             logger.info("Changes pushed successfully")
         else:
             logger.info("No changes to commit")
+            
     except Exception as e:
         logger.error(f"Failed to commit and push changes: {str(e)}")
         raise
 
 def ini_to_dict(file_path):
-    """Convert .pca file (INI format) to dictionary."""
+    """Convert .pca file (INI format) to dictionary with proper type conversion."""
     parser = configparser.ConfigParser()
     parser.optionxform = str  # Preserve case in keys
     parser.read(file_path)
@@ -155,8 +145,10 @@ def process_pca_files(settings):
     input_dir = settings["INPUT_DIR"]
     output_dir = settings["OUTPUT_DIR"]
     archive_dir = settings["ARCHIVE_DIR"]
-    
+    repo_dir = settings["GIT_LOCAL_REPO_DIR"]
+
     # Process each .pca file
+    files_processed = False
     for filename in os.listdir(input_dir):
         if filename.lower().endswith(".pca"):
             try:
@@ -171,8 +163,17 @@ def process_pca_files(settings):
                 with open(json_path, "w") as f:
                     json.dump(data, f, indent=4)
 
+                # Copy to repository if configured
+                if repo_dir:
+                    json_repo_path = os.path.join(repo_dir, 'json')
+                    os.makedirs(json_repo_path, exist_ok=True)
+                    repo_json_path = os.path.join(json_repo_path, json_file)
+                    shutil.copy2(json_path, repo_json_path)
+                    files_processed = True
+
                 # Archive original file
                 shutil.copy2(ini_path, os.path.join(archive_dir, filename))
+                os.remove(ini_path)  # Remove original after successful processing
 
                 # Create readme file
                 readme_filename = f"{base_name}_metadataparser_readme.txt"
@@ -190,19 +191,9 @@ def process_pca_files(settings):
                 logger.error(f"Failed to process {filename}: {str(e)}")
                 continue
 
-    # Copy JSON files to Git repo if configured
-    repo_dir = settings["GIT_LOCAL_REPO_DIR"]
-    if repo_dir and os.path.exists(repo_dir):
+    # Commit and push changes if files were processed
+    if files_processed and repo_dir:
         try:
-            json_repo_subfolder = os.path.join(repo_dir, "json")
-            os.makedirs(json_repo_subfolder, exist_ok=True)
-
-            for file_name in os.listdir(output_dir):
-                if file_name.lower().endswith(".json"):
-                    src = os.path.join(output_dir, file_name)
-                    dst = os.path.join(json_repo_subfolder, file_name)
-                    shutil.copy2(src, dst)
-
             commit_and_push_changes(
                 repo_dir=repo_dir,
                 commit_message="Auto-commit: PCA to JSON updates",
@@ -211,7 +202,7 @@ def process_pca_files(settings):
                 token=settings["TOKEN"]
             )
         except Exception as e:
-            logger.error(f"Failed to update Git repository: {str(e)}")
+            logger.error(f"Failed to push changes to repository: {str(e)}")
             raise
 
 def main():
