@@ -60,42 +60,59 @@ class FileHandler(FileSystemEventHandler):
                 logger.info(f"Skipping non-PCA file: {file_path}")
                 return
 
+            # Replace spaces with underscores in filename
             filename = os.path.basename(file_path)
-            logger.info(f"Processing PCA file: {filename}")
+            safe_filename = filename.replace(' ', '_')
+            
+            logger.info(f"Processing PCA file: {filename} (safe name: {safe_filename})")
 
             # If file is from network share, copy to input directory
             if '/mnt/windows_share' in file_path:
                 logger.info(f"File from network share, copying to input directory")
-                local_path = os.path.join(self.input_dir, filename)
-                shutil.copy2(file_path, local_path)
-                logger.info(f"Copied to: {local_path}")
-                # Remove original file from share
-                os.remove(file_path)
-                logger.info(f"Removed original file from share")
-                # Add both paths to processed files
-                self.processed_files.add(file_path)
-                self.processed_files.add(local_path)
-                return  # Let the local file watcher handle the processing
+                local_path = os.path.join(self.input_dir, safe_filename)
+                
+                # Ensure input directory exists
+                os.makedirs(self.input_dir, exist_ok=True)
+                
+                try:
+                    shutil.copy2(file_path, local_path)
+                    logger.info(f"Copied to: {local_path}")
+                    # Remove original file from share
+                    os.remove(file_path)
+                    logger.info(f"Removed original file from share")
+                    # Add both paths to processed files
+                    self.processed_files.add(file_path)
+                    self.processed_files.add(local_path)
+                    return  # Let the local file watcher handle the processing
+                except Exception as copy_error:
+                    logger.error(f"Failed to copy file: {str(copy_error)}\n{traceback.format_exc()}")
+                    return
 
             # Convert PCA to JSON
             try:
                 with open(file_path, 'r') as pca_file:
                     pca_data = pca_file.read()
-                    logger.debug(f"Raw PCA data:\n{pca_data}")  # Add debug logging
                     
                 # Parse PCA data and convert to JSON
                 json_data = self.convert_pca_to_json(pca_data)
-                logger.debug(f"Converted JSON data:\n{json.dumps(json_data, indent=4)}")  # Add debug logging
                 
-                # Save JSON file
-                json_filename = os.path.splitext(filename)[0] + '.json'
+                # Save JSON file - use safe filename
+                json_filename = os.path.splitext(safe_filename)[0] + '.json'
                 json_path = os.path.join(self.output_dir, json_filename)
+                
+                # Ensure output directory exists
+                os.makedirs(self.output_dir, exist_ok=True)
+                
                 with open(json_path, 'w') as json_file:
                     json.dump(json_data, json_file, indent=4)
                 logger.info(f"Created JSON file: {json_path}")
                 
-                # Move original PCA file to archive
-                archive_path = os.path.join(self.archive_dir, filename)
+                # Move original PCA file to archive - use safe filename
+                archive_path = os.path.join(self.archive_dir, safe_filename)
+                
+                # Ensure archive directory exists
+                os.makedirs(self.archive_dir, exist_ok=True)
+                
                 shutil.move(file_path, archive_path)
                 logger.info(f"Moved PCA file to archive: {archive_path}")
                 
@@ -117,7 +134,7 @@ class FileHandler(FileSystemEventHandler):
                     json_repo_path = os.path.join(repo_dir, 'json')
                     os.makedirs(json_repo_path, exist_ok=True)
                     
-                    # Copy JSON to git repo
+                    # Copy JSON to git repo - use safe filename
                     repo_json_path = os.path.join(json_repo_path, json_filename)
                     shutil.copy2(json_path, repo_json_path)
                     
