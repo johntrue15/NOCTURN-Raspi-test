@@ -23,7 +23,13 @@ get_github_token() {
     while true; do
         read -p "Enter your GitHub personal access token: " github_token
         if [ -n "$github_token" ]; then
-            break
+            # Test token validity
+            if curl -s -H "Authorization: token $github_token" https://api.github.com/user > /dev/null; then
+                echo "Token validated successfully"
+                break
+            else
+                echo "Invalid token. Please check and try again."
+            fi
         else
             echo "Token cannot be empty. Please try again."
         fi
@@ -77,7 +83,7 @@ chmod 600 /root/.git-credentials
 # Configure git globally
 git config --global credential.helper store
 git config --global user.name "PCA Parser"
-git config --global user.email "$GITHUB_USERNAME@users.noreply.github.com"
+git config --global user.email "jtrue15@ufl.edu"
 git config --global init.defaultBranch "main"
 git config --global pull.rebase false
 
@@ -85,14 +91,14 @@ git config --global pull.rebase false
 cd /opt/pca_parser/gitrepo
 if [ ! -d .git ]; then
     git init
-    git remote add origin "https://github.com/$GITHUB_USERNAME/NOCTURN-Raspi-test.git"
+    git remote add origin "https://$GITHUB_TOKEN@github.com/$GITHUB_USERNAME/NOCTURN-Raspi-test.git"
     # Create and switch to specified branch
     git fetch origin
     git checkout -b "$BRANCH_NAME" "origin/$BRANCH_NAME"
 fi
 
 # Configure repository
-git config remote.origin.url "https://github.com/$GITHUB_USERNAME/NOCTURN-Raspi-test.git"
+git config remote.origin.url "https://$GITHUB_TOKEN@github.com/$GITHUB_USERNAME/NOCTURN-Raspi-test.git"
 
 # Test the connection
 echo "Testing GitHub connection..."
@@ -132,3 +138,27 @@ verify_git_setup() {
 
 verify_git_setup || echo "Warning: Git verification failed"
 echo "Git configuration completed successfully!" 
+
+test_git_operations() {
+    echo "Testing Git operations..."
+    
+    # Create test file
+    echo "test" > test.txt
+    
+    # Try git operations
+    if git add test.txt && \
+       git commit -m "Test commit" && \
+       git push origin "$BRANCH_NAME"; then
+        echo "Git operations test successful"
+        git rm test.txt
+        git commit -m "Remove test file"
+        git push origin "$BRANCH_NAME"
+        return 0
+    else
+        echo "Git operations test failed"
+        return 1
+    fi
+}
+
+# Add test after repository setup
+test_git_operations || echo "Warning: Git operations test failed" 

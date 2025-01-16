@@ -10,6 +10,7 @@ from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 from watchdog.observers.polling import PollingObserver
 import time
+from git import Repo
 
 # Configure logging
 logging.basicConfig(
@@ -280,6 +281,17 @@ def main():
             logger.info(f"Started observer for paths: {[w.path for w in observer._watches]}")
             
         logger.info("File monitoring started")
+        
+        # Read Git configuration
+        git_token = config['Git']['PERSONAL_ACCESS_TOKEN']
+        git_username = config['Git']['USERNAME']
+        git_branch = config['Git']['BRANCH']
+        
+        # Update Git remote URL with token
+        repo_dir = "/opt/pca_parser/gitrepo"
+        repo = Repo(repo_dir)
+        repo.git.remote('set-url', 'origin', 
+            f"https://{git_token}@github.com/{git_username}/NOCTURN-Raspi-test.git")
         
         # Keep the script running
         while True:
