@@ -57,6 +57,7 @@ User=root
 Group=root
 StandardOutput=append:/var/log/pca_parser.log
 StandardError=append:/var/log/pca_parser.error.log
+Environment=PYTHONUNBUFFERED=1
 
 [Install]
 WantedBy=multi-user.target
