@@ -74,11 +74,70 @@ class FileHandler(FileSystemEventHandler):
                 self.processed_files.add(local_path)
                 return  # Let the local file watcher handle the processing
 
-            # Your existing processing logic here
-            # Add actual file processing code here
-            logger.info(f"File processing complete: {filename}")
+            # Convert PCA to JSON
+            try:
+                with open(file_path, 'r') as pca_file:
+                    pca_data = pca_file.read()
+                    
+                # Parse PCA data and convert to JSON
+                json_data = self.convert_pca_to_json(pca_data)
+                
+                # Save JSON file
+                json_filename = os.path.splitext(filename)[0] + '.json'
+                json_path = os.path.join(self.output_dir, json_filename)
+                with open(json_path, 'w') as json_file:
+                    json.dump(json_data, json_file, indent=4)
+                logger.info(f"Created JSON file: {json_path}")
+                
+                # Move original PCA file to archive
+                archive_path = os.path.join(self.archive_dir, filename)
+                shutil.move(file_path, archive_path)
+                logger.info(f"Moved PCA file to archive: {archive_path}")
+                
+                # Create readme file
+                base_name = os.path.splitext(filename)[0]
+                readme_filename = f"{base_name}_metadataparser_readme.txt"
+                readme_path = os.path.join(self.input_dir, readme_filename)
+                with open(readme_path, "w") as readme_file:
+                    readme_file.write(
+                        f"This file indicates that '{filename}' has been parsed and archived.\n"
+                        f"JSON output is at '{self.output_dir}'\n"
+                        f"A copy of the original is in '{self.archive_dir}'"
+                    )
+                
+                # Git operations
+                try:
+                    repo_dir = "/opt/pca_parser/gitrepo"
+                    # Create json directory in repo if it doesn't exist
+                    json_repo_path = os.path.join(repo_dir, 'json')
+                    os.makedirs(json_repo_path, exist_ok=True)
+                    
+                    # Copy JSON to git repo
+                    repo_json_path = os.path.join(json_repo_path, json_filename)
+                    shutil.copy2(json_path, repo_json_path)
+                    
+                    # Git add, commit, and push
+                    repo = Repo(repo_dir)
+                    repo.git.config('--local', 'user.name', 'PCA Parser')
+                    repo.git.config('--local', 'user.email', 'jtrue15@ufl.edu')
+                    repo.git.add(A=True)
+                    
+                    if repo.is_dirty(untracked_files=True):
+                        commit_message = "Auto-commit: PCA to JSON updates"
+                        repo.index.commit(commit_message)
+                        repo.git.push('origin', 'Test-1-16')
+                        logger.info(f"Git: Committed and pushed {json_filename}")
+                    else:
+                        logger.info("No changes to commit")
+                        
+                except Exception as git_error:
+                    logger.error(f"Git operation failed: {str(git_error)}\n{traceback.format_exc()}")
+                
+            except Exception as convert_error:
+                logger.error(f"Conversion failed: {str(convert_error)}\n{traceback.format_exc()}")
+                return
             
-            # Add to processed files after successful processing
+            logger.info(f"File processing complete: {filename}")
             self.processed_files.add(file_path)
             
             # Periodically clean up processed files list (keep last 1000)
@@ -87,6 +146,38 @@ class FileHandler(FileSystemEventHandler):
 
         except Exception as e:
             logger.error(f"Error processing file {file_path}: {str(e)}\n{traceback.format_exc()}")
+
+    def convert_pca_to_json(self, pca_data):
+        """Convert PCA data to JSON format using configparser"""
+        try:
+            # Create a ConfigParser instance
+            parser = configparser.ConfigParser()
+            parser.optionxform = str  # Preserve case in keys
+            
+            # Read PCA data from string
+            parser.read_string(pca_data)
+            
+            # Convert to dictionary with proper type conversion
+            data_dict = {}
+            for section in parser.sections():
+                section_dict = {}
+                for key, value in parser.items(section):
+                    try:
+                        # Convert to float if decimal point present, else try integer
+                        if "." in value:
+                            section_dict[key] = float(value)
+                        else:
+                            section_dict[key] = int(value)
+                    except ValueError:
+                        # Keep as string if conversion fails
+                        section_dict[key] = value
+                data_dict[section] = section_dict
+                
+            return data_dict
+            
+        except Exception as e:
+            logger.error(f"PCA to JSON conversion failed: {str(e)}\n{traceback.format_exc()}")
+            raise
 
 def test_watchdog(path):
     """Test if watchdog can detect changes in the directory"""
