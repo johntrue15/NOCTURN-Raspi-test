@@ -32,12 +32,23 @@ get_github_username() {
     echo "$github_username"
 }
 
+# Function to prompt for branch
+get_branch_name() {
+    read -p "Enter branch name (main/Test-1-16): " branch_name
+    # Default to Test-1-16 if empty
+    if [ -z "$branch_name" ]; then
+        branch_name="Test-1-16"
+    fi
+    echo "$branch_name"
+}
+
 # Main setup
 echo "Setting up Git configurations..."
 
-# Get GitHub credentials
+# Get GitHub credentials and branch
 GITHUB_TOKEN=$(get_github_token)
 GITHUB_USERNAME=$(get_github_username)
+BRANCH_NAME=$(get_branch_name)
 
 # Set up git credentials
 echo "https://$GITHUB_USERNAME:$GITHUB_TOKEN@github.com" > /root/.git-credentials
@@ -53,9 +64,9 @@ cd /opt/pca_parser/gitrepo
 if [ ! -d .git ]; then
     git init
     git remote add origin "https://github.com/$GITHUB_USERNAME/NOCTURN-Raspi-test.git"
-    git fetch
-    git checkout -b main
-    git branch --set-upstream-to=origin/main main
+    # Create and switch to specified branch
+    git fetch origin
+    git checkout -b "$BRANCH_NAME" "origin/$BRANCH_NAME"
 fi
 
 # Configure repository
@@ -65,6 +76,13 @@ git config remote.origin.url "https://github.com/$GITHUB_USERNAME/NOCTURN-Raspi-
 echo "Testing GitHub connection..."
 if git ls-remote >/dev/null 2>&1; then
     echo "GitHub configuration successful!"
+    
+    # Ensure we're on the correct branch and it's up to date
+    git fetch origin
+    git checkout "$BRANCH_NAME" || git checkout -b "$BRANCH_NAME" "origin/$BRANCH_NAME"
+    git pull origin "$BRANCH_NAME" || true
+    
+    echo "Repository setup completed successfully on branch: $BRANCH_NAME"
 else
     echo "Error: Could not connect to GitHub. Please check your credentials and try again."
     exit 1
