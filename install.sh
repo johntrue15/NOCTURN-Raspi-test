@@ -40,6 +40,20 @@ cp pca_parser.py "$INSTALL_DIR/pca_parser.py"
 cp config.ini "$INSTALL_DIR/config.ini"
 chmod +x "$INSTALL_DIR/pca_parser.py"
 
+# After copying config.ini, update it with Git credentials
+update_config() {
+    local config_file="/opt/pca_parser/config.ini"
+    local token="$1"
+    local username="$2"
+    local branch="$3"
+
+    # Update Git section in config.ini
+    sed -i "s/USERNAME = .*/USERNAME = $username/" "$config_file"
+    sed -i "s/PERSONAL_ACCESS_TOKEN = .*/PERSONAL_ACCESS_TOKEN = $token/" "$config_file"
+    sed -i "s/BRANCH = .*/BRANCH = $branch/" "$config_file"
+    sed -i "s|REPO_URL = .*|REPO_URL = https://github.com/$username/NOCTURN-Raspi-test.git|" "$config_file"
+}
+
 # Create systemd service file
 echo "Creating systemd service..."
 cat > /etc/systemd/system/pca_parser.service << 'EOF'
@@ -109,3 +123,17 @@ echo "  journalctl -u pca_parser.service -f"
 echo "Log files are located at:"
 echo "  /var/log/pca_parser.log"
 echo "  /var/log/pca_parser.error.log"
+
+# After running setup_git_config.sh
+if [ $? -eq 0 ]; then
+    # Get the token, username, and branch from the Git setup
+    TOKEN=$(cat /root/.git-credentials | grep -o 'https://[^:]*:\([^@]*\)' | cut -d':' -f2)
+    USERNAME=$(git config --global user.name)
+    BRANCH=$(cd /opt/pca_parser/gitrepo && git branch --show-current)
+    
+    # Update config.ini with Git credentials
+    update_config "$TOKEN" "$USERNAME" "$BRANCH"
+else
+    echo "GitHub configuration failed. Please check the errors and try again."
+    exit 1
+fi

@@ -73,6 +73,7 @@ echo "Setting up Git configurations..."
 
 # Get GitHub credentials and branch
 GITHUB_TOKEN=$(get_github_token)
+echo "$GITHUB_TOKEN" > /tmp/git_token  # Store token temporarily
 GITHUB_USERNAME=$(get_github_username)
 BRANCH_NAME=$(get_branch_name)
 
