@@ -9,8 +9,8 @@ fi
 # Function to prompt for SMB details
 get_smb_details() {
     read -p "Enter Windows PC IP address: " windows_ip
-    read -p "Enter Windows share username: " share_user
-    read -s -p "Enter Windows share password: " share_password
+    read -p "Enter Windows username (Dell_): " share_user
+    read -s -p "Enter Windows password: " share_password
     echo ""  # New line after password input
     
     # Create credentials file
@@ -23,7 +23,8 @@ get_smb_details() {
     
     # Add entry to fstab for persistent mount
     echo "Adding mount to /etc/fstab..."
-    echo "//$windows_ip/SharedPi /mnt/windows_share cifs credentials=/root/.smbcredentials,iocharset=utf8,file_mode=0777,dir_mode=0777 0 0" >> /etc/fstab
+    # Note: Using the specific OneDrive Documents path
+    echo "//$windows_ip/Users/Dell_/OneDrive/Documents/NOCTURN /mnt/windows_share cifs credentials=/root/.smbcredentials,iocharset=utf8,file_mode=0777,dir_mode=0777 0 0" >> /etc/fstab
     
     # Try mounting
     echo "Attempting to mount share..."
