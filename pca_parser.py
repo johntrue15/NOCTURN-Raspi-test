@@ -271,28 +271,52 @@ def test_watchdog(path):
 def check_and_remount_share(config_path='/root/.smbcredentials'):
     """Check mount status and attempt remount if needed"""
     try:
-        # Check if share is mounted
-        if not os.path.ismount('/mnt/windows_share'):
-            logger.warning("Share not mounted, attempting remount...")
+        # Read IP from fstab
+        with open('/etc/fstab', 'r') as f:
+            fstab_content = f.read()
+            ip_match = re.search(r'//(\d+\.\d+\.\d+\.\d+)/NOCTURN', fstab_content)
+            if not ip_match:
+                raise Exception("Could not find Windows IP in fstab")
+            windows_ip = ip_match.group(1)
+
+        # Test connection to Windows host
+        ping_result = os.system(f"ping -c 1 -W 2 {windows_ip} >/dev/null 2>&1")
+        if ping_result != 0:
+            logger.error(f"Windows host {windows_ip} is not responding")
+            return False
+
+        # Check if share is mounted AND accessible
+        is_mounted = os.path.ismount('/mnt/windows_share')
+        can_access = False
+        if is_mounted:
+            try:
+                # Try to list directory contents
+                os.listdir('/mnt/windows_share')
+                can_access = True
+            except Exception:
+                logger.warning("Share is mounted but not accessible")
+                is_mounted = False
+
+        if not is_mounted or not can_access:
+            logger.warning("Share not mounted or not accessible, attempting remount...")
             
-            # Read IP from fstab
-            with open('/etc/fstab', 'r') as f:
-                fstab_content = f.read()
-                ip_match = re.search(r'//(\d+\.\d+\.\d+\.\d+)/NOCTURN', fstab_content)
-                if not ip_match:
-                    raise Exception("Could not find Windows IP in fstab")
-                windows_ip = ip_match.group(1)
-            
-            # Try unmounting first in case it's in a bad state
+            # Force unmount if in bad state
             os.system('umount -f /mnt/windows_share 2>/dev/null')
+            time.sleep(1)  # Wait a moment
             
             # Attempt remount
             mount_cmd = f"mount -t cifs //{windows_ip}/NOCTURN /mnt/windows_share -o credentials={config_path},iocharset=utf8,dir_mode=0777,file_mode=0777"
             result = os.system(mount_cmd)
             
             if result == 0:
-                logger.info("Successfully remounted share")
-                return True
+                # Verify the mount is actually working
+                try:
+                    os.listdir('/mnt/windows_share')
+                    logger.info("Successfully remounted share and verified access")
+                    return True
+                except Exception:
+                    logger.error("Mount succeeded but share is not accessible")
+                    return False
             else:
                 logger.error("Failed to remount share")
                 return False
@@ -366,9 +390,16 @@ def main():
             else:
                 logger.error("Network share watchdog test failed")
         
+        # Start all observers
+        for observer in observers:
+            observer.start()
+            logger.info(f"Started observer for paths: {[w.path for w in observer._watches]}")
+        
+        logger.info("File monitoring started")
+        
         # Track last mount check time
         last_mount_check = datetime.datetime.now()
-        mount_check_interval = datetime.timedelta(minutes=1)  # Check every minute
+        mount_check_interval = datetime.timedelta(seconds=15)  # Check every 15 seconds
         
         # Keep the script running
         while True:
@@ -381,7 +412,14 @@ def main():
                 
                 # Check and remount if needed
                 if not check_and_remount_share():
-                    logger.warning("Mount check failed, will retry in 1 minute")
+                    logger.warning("Mount check failed, will retry in 15 seconds")
+                    # Force observer restart on next successful mount
+                    for observer in observers:
+                        try:
+                            observer.stop()
+                        except Exception as e:
+                            logger.warning(f"Error stopping observer: {str(e)}")
+                    observers.clear()
                     continue
                 
                 # If mount was restored, restart observers
@@ -408,7 +446,16 @@ def main():
             # Check if observers are alive
             if not any(observer.is_alive() for observer in observers):
                 logger.error("All observers died, attempting recovery")
-                raise RuntimeError("Observer died")
+                # Try to restart observers instead of raising error
+                try:
+                    for observer in observers:
+                        if not observer.is_alive():
+                            observer.start()
+                    if not any(observer.is_alive() for observer in observers):
+                        raise RuntimeError("Failed to restart observers")
+                except Exception as restart_error:
+                    logger.error(f"Observer restart failed: {str(restart_error)}")
+                    raise RuntimeError("Observer restart failed")
                 
     except Exception as e:
         logger.error(f"Fatal error: {str(e)}\n{traceback.format_exc()}")
