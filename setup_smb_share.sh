@@ -50,9 +50,9 @@ get_smb_details() {
     
     # Array of different mount options to try
     MOUNT_OPTIONS=(
-        "vers=2.0,credentials=/root/.smbcredentials,iocharset=utf8,dir_mode=0777,file_mode=0777"
-        "vers=3.0,credentials=/root/.smbcredentials,iocharset=utf8,dir_mode=0777,file_mode=0777"
-        "vers=2.1,credentials=/root/.smbcredentials,iocharset=utf8,dir_mode=0777,file_mode=0777"
+        "vers=2.0,credentials=/root/.smbcredentials,iocharset=utf8,dir_mode=0777,file_mode=0777,notify"
+        "vers=3.0,credentials=/root/.smbcredentials,iocharset=utf8,dir_mode=0777,file_mode=0777,notify"
+        "vers=2.1,credentials=/root/.smbcredentials,iocharset=utf8,dir_mode=0777,file_mode=0777,notify"
     )
     
     # Try each mount option
