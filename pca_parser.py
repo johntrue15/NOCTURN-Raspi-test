@@ -31,6 +31,7 @@ class FileHandler(FileSystemEventHandler):
         self.config = config  # Store config
         self.processed_files = set()  # Track processed files
         logger.info(f"Initialized handler with: input={input_dir}, output={output_dir}, archive={archive_dir}")
+        logger.info(f"Git config: username={self.config['Git']['USERNAME']}, branch={self.config['Git']['BRANCH']}")
 
     def on_any_event(self, event):
         """Catch all events for debugging"""
