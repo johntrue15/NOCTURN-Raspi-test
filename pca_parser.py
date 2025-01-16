@@ -52,7 +52,8 @@ def init_or_update_repo(repo_dir, repo_url, branch, username, token):
     try:
         # Format URL with token
         if token:
-            remote_url = repo_url.replace('https://', f'https://git:{token}@')
+            encoded_token = urllib.parse.quote(token, safe='')
+            remote_url = repo_url.replace('https://', f'https://git:{encoded_token}@')
         else:
             remote_url = repo_url
 
@@ -65,6 +66,9 @@ def init_or_update_repo(repo_dir, repo_url, branch, username, token):
                 origin = repo.remote('origin')
                 origin.set_url(remote_url)
                 
+                # Configure Git to not prompt for credentials
+                repo.git.config('--local', 'credential.helper', 'store')
+                
                 # Fetch and reset to match origin
                 repo.git.fetch('--all')
                 repo.git.reset('--hard', f'origin/{branch}')
@@ -74,11 +78,13 @@ def init_or_update_repo(repo_dir, repo_url, branch, username, token):
                 logger.info(f"Invalid repository at {repo_dir}, recreating...")
                 shutil.rmtree(repo_dir)
                 os.makedirs(repo_dir, exist_ok=True)
-                Repo.clone_from(remote_url, repo_dir, branch=branch)
+                repo = Repo.clone_from(remote_url, repo_dir, branch=branch)
+                repo.git.config('--local', 'credential.helper', 'store')
                 logger.info("Repository cloned successfully")
         else:
             os.makedirs(repo_dir, exist_ok=True)
-            Repo.clone_from(remote_url, repo_dir, branch=branch)
+            repo = Repo.clone_from(remote_url, repo_dir, branch=branch)
+            repo.git.config('--local', 'credential.helper', 'store')
             logger.info("Repository cloned successfully")
 
     except Exception as e:
@@ -93,6 +99,10 @@ def commit_and_push_changes(repo_dir, commit_message, branch, username, token):
     try:
         repo = Repo(repo_dir)
         
+        # Configure Git
+        repo.git.config('--local', 'user.name', 'PCA Parser')
+        repo.git.config('--local', 'user.email', 'jtrue15@ufl.edu')
+        
         # Add all changes
         repo.git.add(A=True)
         
@@ -104,8 +114,8 @@ def commit_and_push_changes(repo_dir, commit_message, branch, username, token):
             # Update remote URL with token if provided
             if token:
                 origin = repo.remote('origin')
-                current_url = origin.url
-                remote_url = current_url.replace('https://', f'https://git:{token}@')
+                encoded_token = urllib.parse.quote(token, safe='')
+                remote_url = repo_url.replace('https://', f'https://git:{encoded_token}@')
                 origin.set_url(remote_url)
             
             logger.info("Pushing changes to remote...")
