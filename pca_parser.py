@@ -7,6 +7,9 @@ import shutil
 import urllib.parse
 import logging
 from git import Repo, InvalidGitRepositoryError, NoSuchPathError
+import time
+from watchdog.observers import Observer
+from watchdog.events import FileSystemEventHandler
 
 # Configure logging
 logging.basicConfig(
@@ -191,6 +194,42 @@ def process_pca_files(settings):
         except Exception as e:
             logger.error(f"Failed to push changes to repository: {str(e)}")
             raise
+
+class MultiPathHandler(FileSystemEventHandler):
+    def __init__(self, config):
+        self.input_dir = config['Paths']['input_dir']
+        self.output_dir = config['Paths']['output_dir']
+        self.archive_dir = config['Paths']['archive_dir']
+        self.shared_enabled = config['SharedDrive'].getboolean('enabled')
+        self.shared_dir = config['SharedDrive']['watch_dir'] if self.shared_enabled else None
+        
+    def on_created(self, event):
+        if event.is_directory:
+            return
+            
+        file_path = event.src_path
+        
+        # Determine if file is from shared drive or local input
+        is_shared = self.shared_enabled and self.shared_dir in file_path
+        
+        if is_shared:
+            # Copy file from shared drive to input directory
+            filename = os.path.basename(file_path)
+            dest_path = os.path.join(self.input_dir, filename)
+            shutil.copy2(file_path, dest_path)
+            
+            # Process the copied file
+            self.process_file(dest_path)
+            
+            # Remove original file from shared drive
+            os.remove(file_path)
+        else:
+            # Process file directly from input directory
+            self.process_file(file_path)
+    
+    def process_file(self, file_path):
+        # Your existing file processing logic here
+        pass
 
 def main():
     """Main execution function."""

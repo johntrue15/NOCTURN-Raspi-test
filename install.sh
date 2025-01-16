@@ -72,6 +72,32 @@ chmod 644 /var/log/pca_parser.error.log
 echo "Reloading systemd daemon..."
 systemctl daemon-reload
 
+echo "Setting up GitHub configurations..."
+chmod +x setup_git_config.sh
+./setup_git_config.sh
+
+# If setup_git_config.sh fails, stop the installation
+if [ $? -ne 0 ]; then
+    echo "GitHub configuration failed. Please check the errors and try again."
+    exit 1
+fi
+
+echo "Setting up SMB share..."
+chmod +x setup_smb_share.sh
+./setup_smb_share.sh
+
+# If setup_smb_share.sh fails, ask user if they want to continue
+if [ $? -ne 0 ]; then
+    read -p "SMB share setup failed. Continue with local-only installation? (y/n) " answer
+    if [ "$answer" != "y" ]; then
+        echo "Installation aborted."
+        exit 1
+    else
+        # Update config to disable shared drive
+        sed -i 's/enabled = true/enabled = false/' "$INSTALL_DIR/config.ini"
+    fi
+fi
+
 echo "Enabling and starting service..."
 systemctl enable pca_parser.service
 systemctl start pca_parser.service
