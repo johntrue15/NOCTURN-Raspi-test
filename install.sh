@@ -52,6 +52,10 @@ update_config() {
     sed -i "s/PERSONAL_ACCESS_TOKEN = .*/PERSONAL_ACCESS_TOKEN = $token/" "$config_file"
     sed -i "s/BRANCH = .*/BRANCH = $branch/" "$config_file"
     sed -i "s|REPO_URL = .*|REPO_URL = https://github.com/$username/NOCTURN-Raspi-test.git|" "$config_file"
+    
+    # Verify the updates
+    echo "Verifying config.ini updates..."
+    cat "$config_file"
 }
 
 # Create systemd service file
@@ -126,10 +130,14 @@ echo "  /var/log/pca_parser.error.log"
 
 # After running setup_git_config.sh
 if [ $? -eq 0 ]; then
-    # Get the token, username, and branch from the Git setup
-    TOKEN=$(cat /root/.git-credentials | grep -o 'https://[^:]*:\([^@]*\)' | cut -d':' -f2)
-    USERNAME=$(git config --global user.name)
+    # Get the token from temporary file
+    TOKEN=$(cat /tmp/git_token)
+    USERNAME=$(cat /root/.git-credentials | grep -o 'https://\([^:]*\):' | cut -d'/' -f3 | cut -d':' -f1)
     BRANCH=$(cd /opt/pca_parser/gitrepo && git branch --show-current)
+    
+    echo "Updating config.ini with:"
+    echo "Username: $USERNAME"
+    echo "Branch: $BRANCH"
     
     # Update config.ini with Git credentials
     update_config "$TOKEN" "$USERNAME" "$BRANCH"

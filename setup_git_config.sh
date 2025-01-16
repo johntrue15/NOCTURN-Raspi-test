@@ -83,7 +83,7 @@ chmod 600 /root/.git-credentials
 
 # Configure git globally
 git config --global credential.helper store
-git config --global user.name "PCA Parser"
+git config --global user.name "$GITHUB_USERNAME"
 git config --global user.email "jtrue15@ufl.edu"
 git config --global init.defaultBranch "main"
 git config --global pull.rebase false

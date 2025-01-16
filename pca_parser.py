@@ -121,14 +121,15 @@ class FileHandler(FileSystemEventHandler):
                     
                     # Git add, commit, and push
                     repo = Repo(repo_dir)
-                    repo.git.config('--local', 'user.name', 'PCA Parser')
+                    repo.git.config('--local', 'user.name', config['Git']['USERNAME'])
                     repo.git.config('--local', 'user.email', 'jtrue15@ufl.edu')
                     repo.git.add(A=True)
                     
                     if repo.is_dirty(untracked_files=True):
                         commit_message = "Auto-commit: PCA to JSON updates"
                         repo.index.commit(commit_message)
-                        repo.git.push('origin', 'Test-1-16')
+                        origin = repo.remote('origin')
+                        origin.push(config['Git']['BRANCH'])
                         logger.info(f"Git: Committed and pushed {json_filename}")
                     else:
                         logger.info("No changes to commit")
