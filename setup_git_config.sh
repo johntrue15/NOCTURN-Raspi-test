@@ -23,18 +23,18 @@ get_github_token() {
     while true; do
         read -p "Enter your GitHub personal access token: " github_token
         if [ -n "$github_token" ]; then
-            # Test token validity
-            if curl -s -H "Authorization: token $github_token" https://api.github.com/user > /dev/null; then
-                echo "Token validated successfully"
-                break
+            # Test token validity silently
+            if curl -s -H "Authorization: token $github_token" https://api.github.com/user >/dev/null 2>&1; then
+                echo "Token validated successfully" >&2
+                echo "$github_token"  # Output token only
+                return 0
             else
-                echo "Invalid token. Please check and try again."
+                echo "Invalid token. Please check and try again." >&2
             fi
         else
-            echo "Token cannot be empty. Please try again."
+            echo "Token cannot be empty. Please try again." >&2
         fi
     done
-    echo "$github_token"
 }
 
 # Function to prompt for GitHub username
@@ -77,7 +77,7 @@ GITHUB_USERNAME=$(get_github_username)
 BRANCH_NAME=$(get_branch_name)
 
 # Set up git credentials
-echo "https://$GITHUB_USERNAME:$GITHUB_TOKEN@github.com" > /root/.git-credentials
+printf "https://%s:%s@github.com\n" "$GITHUB_USERNAME" "$GITHUB_TOKEN" > /root/.git-credentials
 chmod 600 /root/.git-credentials
 
 # Configure git globally
@@ -91,14 +91,16 @@ git config --global pull.rebase false
 cd /opt/pca_parser/gitrepo
 if [ ! -d .git ]; then
     git init
-    git remote add origin "https://$GITHUB_TOKEN@github.com/$GITHUB_USERNAME/NOCTURN-Raspi-test.git"
+    REPO_URL="https://${GITHUB_TOKEN}@github.com/${GITHUB_USERNAME}/NOCTURN-Raspi-test.git"
+    git remote add origin "$REPO_URL"
     # Create and switch to specified branch
     git fetch origin
     git checkout -b "$BRANCH_NAME" "origin/$BRANCH_NAME"
 fi
 
 # Configure repository
-git config remote.origin.url "https://$GITHUB_TOKEN@github.com/$GITHUB_USERNAME/NOCTURN-Raspi-test.git"
+REPO_URL="https://${GITHUB_TOKEN}@github.com/${GITHUB_USERNAME}/NOCTURN-Raspi-test.git"
+git config remote.origin.url "$REPO_URL"
 
 # Test the connection
 echo "Testing GitHub connection..."
