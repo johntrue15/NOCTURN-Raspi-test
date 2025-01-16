@@ -50,6 +50,11 @@ def read_config():
 def init_or_update_repo(repo_dir, repo_url, branch, username, token):
     """Initialize or update the Git repository."""
     try:
+        # If the directory exists but is not a valid repo, remove it
+        if os.path.exists(repo_dir) and not os.path.exists(os.path.join(repo_dir, '.git')):
+            logger.info(f"Removing invalid repository at {repo_dir}")
+            shutil.rmtree(repo_dir)
+
         if not os.path.exists(repo_dir):
             logger.info(f"Cloning repository from {repo_url} into {repo_dir}...")
 
@@ -61,11 +66,22 @@ def init_or_update_repo(repo_dir, repo_url, branch, username, token):
             else:
                 repo_url_with_creds = repo_url
 
+            os.makedirs(os.path.dirname(repo_dir), exist_ok=True)
             Repo.clone_from(repo_url_with_creds, repo_dir, branch=branch)
             logger.info("Repository cloned successfully")
         else:
             logger.info(f"Found existing repo at {repo_dir}. Pulling latest changes...")
             repo = Repo(repo_dir)
+            
+            # Set up credentials for pull if provided
+            if username and token:
+                origin = repo.remote("origin")
+                old_url = origin.url.replace("https://", "")
+                username_encoded = urllib.parse.quote(username, safe="")
+                token_encoded = urllib.parse.quote(token, safe="")
+                new_url = f"https://{username_encoded}:{token_encoded}@{old_url}"
+                origin.set_url(new_url)
+            
             origin = repo.remotes.origin
             origin.pull(branch)
             logger.info("Repository updated successfully")
