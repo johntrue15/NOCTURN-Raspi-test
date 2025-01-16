@@ -22,7 +22,9 @@ This guide explains how to set up a shared folder on Windows for use with the PC
 
 ## 2. Create and Share the Folder
 
-1. Create a new folder (e.g., `C:\PCA_Share`)
+1. Create a new folder:
+   - Default location: `C:\PCA_Share`
+   - You can use a different path, but remember it for the Raspberry Pi setup
 
 2. Right-click the folder → Properties → Sharing tab → Advanced Sharing
 
@@ -74,7 +76,7 @@ This guide explains how to set up a shared folder on Windows for use with the PC
 
 1. From another Windows PC:
    ```
-   net use \\COMPUTER-NAME\PCA_Share /user:nocturn_share Nocturn123!
+   net use \\COMPUTER-NAME\SHARE-PATH /user:nocturn_share Nocturn123!
    ```
 
 2. Or map network drive:
@@ -82,7 +84,7 @@ This guide explains how to set up a shared folder on Windows for use with the PC
    - Right-click "Network"
    - Click "Map network drive"
    - Drive: `Z:`
-   - Folder: `\\COMPUTER-NAME\PCA_Share`
+   - Folder: `\\COMPUTER-NAME\SHARE-PATH`
    - Check "Connect using different credentials"
    - Enter username: `nocturn_share`
    - Enter password: `Nocturn123!`

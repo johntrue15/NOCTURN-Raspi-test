@@ -134,14 +134,25 @@ class FileHandler(FileSystemEventHandler):
                     json_repo_path = os.path.join(repo_dir, 'json')
                     os.makedirs(json_repo_path, exist_ok=True)
                     
-                    # Copy JSON to git repo - use safe filename
+                    # Copy JSON to git repo
                     repo_json_path = os.path.join(json_repo_path, json_filename)
                     shutil.copy2(json_path, repo_json_path)
                     
-                    # Git add, commit, and push
+                    # Git operations
                     repo = Repo(repo_dir)
                     repo.git.config('--local', 'user.name', self.config['Git']['USERNAME'])
                     repo.git.config('--local', 'user.email', 'jtrue15@ufl.edu')
+                    
+                    # Fetch and pull latest changes
+                    try:
+                        origin = repo.remote('origin')
+                        fetch_info = origin.fetch()
+                        if fetch_info:
+                            logger.info("Fetched latest changes")
+                            # Pull with rebase strategy
+                            repo.git.pull('--rebase', 'origin', self.config['Git']['BRANCH'])
+                    except Exception as fetch_error:
+                        logger.warning(f"Error lines received while fetching: {str(fetch_error)}")
                     
                     # Only add the specific JSON file
                     repo.git.add(repo_json_path)
@@ -150,9 +161,21 @@ class FileHandler(FileSystemEventHandler):
                     if repo.git.diff('--cached', '--name-only'):
                         commit_message = f"Auto-commit: Added {json_filename}"
                         repo.index.commit(commit_message)
-                        origin = repo.remote('origin')
-                        origin.push(self.config['Git']['BRANCH'])
-                        logger.info(f"Git: Committed and pushed {json_filename}")
+                        
+                        # Try push with retries
+                        max_retries = 3
+                        retry_count = 0
+                        while retry_count < max_retries:
+                            try:
+                                origin.push(self.config['Git']['BRANCH'])
+                                logger.info(f"Git: Committed and pushed {json_filename}")
+                                break
+                            except Exception as push_error:
+                                retry_count += 1
+                                if retry_count == max_retries:
+                                    raise
+                                logger.warning(f"Push attempt {retry_count} failed, retrying...")
+                                time.sleep(2)  # Wait before retry
                     else:
                         logger.info(f"No changes to {json_filename}")
                         

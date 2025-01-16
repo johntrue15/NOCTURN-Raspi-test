@@ -64,12 +64,15 @@ cat > /etc/systemd/system/pca_parser.service << 'EOF'
 [Unit]
 Description=PCA Parser Service
 After=network.target
+StartLimitIntervalSec=300
+StartLimitBurst=5
 
 [Service]
 Type=simple
 ExecStart=/usr/bin/python3 /opt/pca_parser/pca_parser.py
-Restart=always
-RestartSec=10
+Restart=on-failure
+RestartSec=30
+StartLimitAction=reboot-force
 WorkingDirectory=/opt/pca_parser
 User=root
 Group=root
