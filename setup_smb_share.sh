@@ -13,7 +13,7 @@ get_smb_details() {
     echo "Debug: Using IP address: $windows_ip"
     
     # Get Windows credentials
-    read -p "Enter Windows username (DELL_): " win_user
+    read -p "Enter Windows username (nocturn_share): " win_user
     read -s -p "Enter Windows password: " win_pass
     echo ""
     
@@ -23,21 +23,8 @@ get_smb_details() {
     # Remove any existing entry for this mount point
     sed -i '\#/mnt/windows_share#d' /etc/fstab
     
-    # Try different connection methods
-    echo "Testing connection methods..."
-    
-    # Method 1: Basic connection test
-    echo "Testing basic connection..."
-    if ping -c 1 $windows_ip >/dev/null 2>&1; then
-        echo "Network connection successful"
-    else
-        echo "Network connection failed"
-        return 1
-    fi
-    
-    # Create credentials file
-    echo "username=$win_user" > /root/.smbcredentials
-    echo "password=$win_pass" >> /root/.smbcredentials
+    # Create credentials file with proper escaping
+    printf "username=%s\npassword=%s\n" "$win_user" "$win_pass" > /root/.smbcredentials
     chmod 600 /root/.smbcredentials
     
     # Try different mount options
@@ -53,23 +40,25 @@ get_smb_details() {
     # Try each mount option
     for options in "${MOUNT_OPTIONS[@]}"; do
         echo "Trying mount with options: $options"
+        # Always try to unmount first
+        echo "Unmounting any existing share..."
+        umount /mnt/windows_share 2>/dev/null || true
+        
         if mount -t cifs "//$windows_ip/NOCTURN" /mnt/windows_share -o "$options" 2>/dev/null; then
             echo "Mount successful with options: $options"
-            # Add successful mount to fstab
-            echo "//$windows_ip/NOCTURN /mnt/windows_share cifs $options 0 0" >> /etc/fstab
+            # Add successful mount to fstab using printf to handle special characters
+            printf "//$windows_ip/NOCTURN /mnt/windows_share cifs %s 0 0\n" "$options" >> /etc/fstab
             return 0
         else
             echo "Mount failed with these options"
             dmesg | tail -n 3
         fi
-        # Cleanup
-        umount /mnt/windows_share 2>/dev/null || true
     done
     
     echo "All mount attempts failed. Please check Windows sharing settings:"
     echo "1. Ensure the folder is shared"
-    echo "2. Check share permissions (Everyone - Full Control)"
-    echo "3. Check NTFS permissions (Everyone - Full Control)"
+    echo "2. Check share permissions (nocturn_share - Full Control)"
+    echo "3. Check NTFS permissions (nocturn_share - Full Control)"
     echo "4. Check Windows Defender Firewall settings"
     return 1
 }
@@ -79,5 +68,27 @@ echo "Installing required packages..."
 apt-get update
 apt-get install -y cifs-utils smbclient
 
+# Add at the end of the script, before get_smb_details is called
+
+verify_mount() {
+    echo "Verifying mount..."
+    if mount | grep -q "windows_share"; then
+        echo "✓ Share mounted successfully"
+        echo "Mount details:"
+        mount | grep "windows_share"
+        echo "Directory contents:"
+        ls -l /mnt/windows_share
+        return 0
+    else
+        echo "✗ Share mount verification failed"
+        return 1
+    fi
+}
+
 # Setup SMB share
-get_smb_details 
+if get_smb_details; then
+    verify_mount
+else
+    echo "SMB setup failed"
+    exit 1
+fi 

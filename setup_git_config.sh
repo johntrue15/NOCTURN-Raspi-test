@@ -34,11 +34,19 @@ get_github_username() {
 
 # Function to prompt for branch
 get_branch_name() {
-    read -p "Enter branch name (main/Test-1-16): " branch_name
-    # Default to Test-1-16 if empty
-    if [ -z "$branch_name" ]; then
-        branch_name="Test-1-16"
-    fi
+    while true; do
+        read -p "Enter branch name (Test-1-16/main): " branch_name
+        # Default to Test-1-16 if empty
+        if [ -z "$branch_name" ]; then
+            branch_name="Test-1-16"
+        fi
+        # Validate branch name
+        if [[ "$branch_name" == "Test-1-16" ]] || [[ "$branch_name" == "main" ]]; then
+            break
+        else
+            echo "Invalid branch name. Please enter 'Test-1-16' or 'main'"
+        fi
+    done
     echo "$branch_name"
 }
 
@@ -58,6 +66,8 @@ chmod 600 /root/.git-credentials
 git config --global credential.helper store
 git config --global user.name "PCA Parser"
 git config --global user.email "$GITHUB_USERNAME@users.noreply.github.com"
+git config --global init.defaultBranch "main"
+git config --global pull.rebase false
 
 # Initialize git repository if it doesn't exist
 cd /opt/pca_parser/gitrepo
@@ -92,4 +102,21 @@ fi
 chown -R root:root /opt/pca_parser/gitrepo
 chmod -R 755 /opt/pca_parser/gitrepo
 
+verify_git_setup() {
+    echo "Verifying git configuration..."
+    echo "Current branch:"
+    git branch --show-current
+    echo "Remote configuration:"
+    git remote -v
+    echo "Testing repository access..."
+    if git fetch origin --quiet 2>/dev/null; then
+        echo "✓ Repository access verified"
+        return 0
+    else
+        echo "✗ Repository access failed"
+        return 1
+    fi
+}
+
+verify_git_setup || echo "Warning: Git verification failed"
 echo "Git configuration completed successfully!" 
