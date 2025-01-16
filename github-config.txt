@@ -1,0 +1,19 @@
+cd /opt/pca_parser/gitrepo
+sudo git config --list
+user.email=jtrue15@ufl.edu
+user.name=johntrue15
+credential.helper=store
+core.repositoryformatversion=0
+core.filemode=true
+core.bare=false
+core.logallrefupdates=true
+remote.origin.url=https://git:<token>/johntrue15/NOCTURN-Raspi-test.git
+remote.origin.fetch=+refs/heads/*:refs/remotes/origin/*
+branch.main.remote=origin
+branch.main.merge=refs/heads/main
+user.name=PCA Parser
+user.email=jtrue15@ufl.edu
+
+
+Caribou1@Caribou1:/opt/pca_parser/gitrepo $ sudo ls -l /root/.git-credentials
+-rw------- 1 root root 135 Jan 16 01:20 /root/.git-credentials
