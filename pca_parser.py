@@ -65,8 +65,10 @@ def init_or_update_repo(repo_dir, repo_url, branch, username, token):
             username_encoded = urllib.parse.quote(username, safe="")
             token_encoded    = urllib.parse.quote(token, safe="")
             repo_url_with_creds = f"https://{username_encoded}:{token_encoded}@{protocol_removed}"
+            print(f"DEBUG: Cloning with URL: {repo_url_with_creds}")
         else:
             repo_url_with_creds = repo_url
+            print(f"DEBUG: Cloning with URL (no creds): {repo_url_with_creds}")
 
         Repo.clone_from(repo_url_with_creds, repo_dir, branch=branch)
     else:
