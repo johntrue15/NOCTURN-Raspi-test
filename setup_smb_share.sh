@@ -8,26 +8,25 @@ fi
 
 # Function to prompt for SMB details
 get_smb_details() {
+    # Debug output to verify IP
     read -p "Enter Windows PC IP address: " windows_ip
-    read -p "Enter Windows username (Dell_): " share_user
-    read -s -p "Enter Windows password: " share_password
-    echo ""  # New line after password input
-    
-    # Create credentials file
-    echo "username=$share_user" > /root/.smbcredentials
-    echo "password=$share_password" >> /root/.smbcredentials
-    chmod 600 /root/.smbcredentials
+    echo "Debug: Using IP address: $windows_ip"
     
     # Create mount point
     mkdir -p /mnt/windows_share
     
+    # Remove any existing entry for this mount point
+    sed -i '\#/mnt/windows_share#d' /etc/fstab
+    
     # Add entry to fstab for persistent mount
     echo "Adding mount to /etc/fstab..."
-    # Note: Using the specific OneDrive Documents path
-    echo "//$windows_ip/Users/Dell_/OneDrive/Documents/NOCTURN /mnt/windows_share cifs credentials=/root/.smbcredentials,iocharset=utf8,file_mode=0777,dir_mode=0777 0 0" >> /etc/fstab
+    MOUNT_LINE="//$windows_ip/Users/DELL_/OneDrive/Documents/NOCTURN /mnt/windows_share cifs guest,noperm,iocharset=utf8,file_mode=0777,dir_mode=0777 0 0"
+    echo "Debug: Mount line: $MOUNT_LINE"
+    echo "$MOUNT_LINE" >> /etc/fstab
     
     # Try mounting
     echo "Attempting to mount share..."
+    umount /mnt/windows_share 2>/dev/null || true
     mount -a
     
     # Test if mount was successful
@@ -36,6 +35,7 @@ get_smb_details() {
         return 0
     else
         echo "Failed to mount SMB share. Please check your settings."
+        dmesg | tail -n 5  # Show recent kernel messages for debugging
         return 1
     fi
 }
