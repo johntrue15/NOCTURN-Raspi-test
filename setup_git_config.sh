@@ -44,10 +44,19 @@ echo "https://$GITHUB_USERNAME:$GITHUB_TOKEN@github.com" > /root/.git-credential
 chmod 600 /root/.git-credentials
 
 # Configure git globally
-cd /opt/pca_parser/gitrepo
 git config --global credential.helper store
 git config --global user.name "PCA Parser"
 git config --global user.email "$GITHUB_USERNAME@users.noreply.github.com"
+
+# Initialize git repository if it doesn't exist
+cd /opt/pca_parser/gitrepo
+if [ ! -d .git ]; then
+    git init
+    git remote add origin "https://github.com/$GITHUB_USERNAME/NOCTURN-Raspi-test.git"
+    git fetch
+    git checkout -b main
+    git branch --set-upstream-to=origin/main main
+fi
 
 # Configure repository
 git config remote.origin.url "https://github.com/$GITHUB_USERNAME/NOCTURN-Raspi-test.git"
