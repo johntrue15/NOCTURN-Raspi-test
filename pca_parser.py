@@ -149,8 +149,18 @@ class FileHandler(FileSystemEventHandler):
                         fetch_info = origin.fetch()
                         if fetch_info:
                             logger.info("Fetched latest changes")
+                            # Stash any uncommitted changes
+                            if repo.is_dirty(untracked_files=True):
+                                logger.info("Stashing uncommitted changes")
+                                repo.git.stash('save')
+                            
                             # Pull with rebase strategy
                             repo.git.pull('--rebase', 'origin', self.config['Git']['BRANCH'])
+                            
+                            # Pop stash if we stashed changes
+                            if repo.git.stash('list'):
+                                logger.info("Popping stashed changes")
+                                repo.git.stash('pop')
                     except Exception as fetch_error:
                         logger.warning(f"Error lines received while fetching: {str(fetch_error)}")
                     
