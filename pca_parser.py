@@ -391,6 +391,13 @@ def main():
                 else:
                     logger.error("Network share watchdog test failed")
             
+            # Start all observers
+            for observer in observers:
+                observer.start()
+                logger.info(f"Started observer for paths: {[w.path for w in observer._watches]}")
+            
+            logger.info("File monitoring started")
+            
             # Track last mount check time
             last_mount_check = datetime.datetime.now()
             mount_check_interval = datetime.timedelta(seconds=15)  # Check every 15 seconds
@@ -452,7 +459,38 @@ def main():
                 # Check if observers are alive
                 if not any(observer.is_alive() for observer in observers):
                     logger.error("All observers died, attempting recovery")
-                    raise RuntimeError("Observer died")  # This will trigger outer loop restart
+                    # Try to restart observers
+                    try:
+                        for observer in observers:
+                            try:
+                                observer.stop()
+                            except Exception:
+                                pass
+                        observers.clear()
+                        
+                        # Recreate and start observers
+                        observer_local = Observer()
+                        observer_local.schedule(event_handler, input_dir, recursive=False)
+                        observers.append(observer_local)
+                        
+                        if os.path.ismount(network_share):
+                            observer_network = PollingObserver(timeout=2)
+                            observer_network.schedule(event_handler, network_share, recursive=False)
+                            observers.append(observer_network)
+                        
+                        for observer in observers:
+                            observer.start()
+                            logger.info(f"Restarted observer for paths: {[w.path for w in observer._watches]}")
+                        
+                        if not any(observer.is_alive() for observer in observers):
+                            raise RuntimeError("Failed to restart observers")
+                        
+                        logger.info("Successfully recovered observers")
+                        continue
+                        
+                    except Exception as restart_error:
+                        logger.error(f"Observer restart failed: {str(restart_error)}")
+                        raise RuntimeError("Observer restart failed")
                     
         except Exception as e:
             logger.error(f"Service error, restarting in 5 seconds: {str(e)}\n{traceback.format_exc()}")
