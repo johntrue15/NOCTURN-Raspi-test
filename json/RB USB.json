@@ -7,16 +7,19 @@
         "SystemName": "v|tome|x m"
     },
     "AutoScO": {
-        "Active": 0
+        "Active": 1,
+        "ImgNr": 8,
+        "ImageString": "225:450:675:900:1125:1350:1575:1800",
+        "Skip": 10
     },
     "Geometry": {
-        "FDD": 802.77534791,
-        "FOD": 436.723875,
-        "Magnification": 1.83817601,
-        "VoxelSizeX": 0.10880351,
-        "VoxelSizeY": 0.10880351,
-        "CalibValue": -0.916,
-        "cx": 1011.5,
+        "FDD": 797.32613998,
+        "FOD": 96.46646576,
+        "Magnification": 8.26531929,
+        "VoxelSizeX": 0.02419749,
+        "VoxelSizeY": 0.02419749,
+        "CalibValue": -7.841,
+        "cx": 1006.5,
         "cy": 1011.5,
         "DetectorRot": 0.0,
         "Tilt": 0.0,
@@ -24,15 +27,15 @@
     },
     "CT": {
         "Type": 0,
-        "NumberImages": 2800,
-        "StartImg": 2801,
+        "NumberImages": 1800,
+        "StartImg": 1801,
         "RotationSector": 360.0,
         "NoRotation": 0,
         "EstimatedTime": 0,
-        "RemainingTime": 2800,
-        "ScanTimeCmpl": 2800,
-        "NrImgDone": 2801,
-        "NrImgCmplScan": 2801,
+        "RemainingTime": 1800,
+        "ScanTimeCmpl": 1800,
+        "NrImgDone": 1801,
+        "NrImgCmplScan": 1801,
         "RefDriveEnabled": 0,
         "SkipForNewInterval": 25,
         "SkipAcc": 1,
@@ -41,7 +44,7 @@
         "Wnd_T": 0,
         "Wnd_R": 10,
         "Wnd_B": 10,
-        "Level": 7854.0
+        "Level": 1291.0
     },
     "VSensor": {
         "EnableTiles": 1,
@@ -68,10 +71,10 @@
         "Left": 0,
         "Bottom": 2023,
         "Right": 2023,
-        "DimX": 2024,
+        "DimX": 2014,
         "DimY": 2024,
         "Rotation": 0,
-        "FreeRay": 7993
+        "FreeRay": 1427
     },
     "ImgProc": {
         "SwBin": 1,
@@ -82,7 +85,7 @@
         "Counter": 0,
         "MaxTimes": 10,
         "TimeTrigOn": 0,
-        "kV": 225,
+        "kV": 165,
         "Time": 60
     },
     "Multiscan": {
@@ -96,19 +99,23 @@
         "Avg": 100,
         "Skip": 10,
         "EnableAutoAcq": 1,
-        "MGainVoltage": "220:220:220:",
-        "MGainCurrent": "400:440:450:",
+        "MGainVoltage": "160:160:160:",
+        "MGainCurrent": "10:20:28:",
         "MGainFilter": "__Unknown__:__Unknown__:__Unknown__:",
         "GainImg": "",
-        "MGainImg": "S:\\CT_DATA\\FICS\\NEW\\4K TV PCB\\TV Vizio PCB_bright_220kV_450uA_333ms_1Det.tif",
-        "OffsetImg": "S:\\CT_DATA\\FICS\\NEW\\4K TV PCB\\TV Vizio PCB_Dark_333.tif",
+        "MGainImg": "S:\\CT_DATA\\FICS\\RB USB\\RB USB_bright_160kV_28uA_333ms_1Det.tif",
+        "OffsetImg": "S:\\CT_DATA\\FICS\\RB USB\\RB USB_Dark_333.tif",
         "DefPixelImg": "C:\\Program Files\\phoenix x-ray\\datosx 2 acq\\CalibrationImages\\pixmask_B1x1_x2024_y2024.tif"
     },
     "SectorScan": {
         "Active": 0
     },
     "DetectorShift": {
-        "Enable": 0
+        "Enable": 1,
+        "Mode": 0,
+        "Amplitude": 5,
+        "Interval": 1,
+        "Step": 1
     },
     "Detector": {
         "InitTimeOut": 60000,
@@ -123,23 +130,23 @@
         "Skip": 1,
         "Binning": 0,
         "BitPP": 16,
-        "CameraGain": 1,
+        "CameraGain": 3,
         "SatValue": 15563,
         "SatPixNrLimit": 4096
     },
     "Xray": {
         "ComPort": 0,
-        "Name": "xs|240 d",
-        "ID": 2476,
+        "Name": "xs|180 hpnf",
+        "ID": 2470,
         "InitTimeout": 20000,
-        "Voltage": 220,
-        "Current": 450,
-        "Mode": 0,
-        "Filter": "0.5Cu",
+        "Voltage": 160,
+        "Current": 28,
+        "Mode": 1,
+        "Filter": "Unknown",
         "Target": "Undefined",
-        "FocalSpotSize": 99.0,
+        "FocalSpotSize": 2.0,
         "Collimation": -1,
-        "WaitTime": 1000,
+        "WaitTime": 5000,
         "WaitForStable": 20000,
         "FocDistX": 0.0,
         "FocDistY": 0.0,
@@ -148,7 +155,7 @@
         "Macro": 0,
         "RestrictNumSpots": 0,
         "PreWarning": 0,
-        "MinGainCurrent": 10
+        "MinGainCurrent": 20
     },
     "Cnc": {
         "InitTimeout": 8000,
@@ -160,18 +167,18 @@
     },
     "CNC_0": {
         "DtxName": "XS",
-        "LoadPos": -149.856813,
+        "LoadPos": -150.04725,
         "AcqPos": 0.0
     },
     "CNC_1": {
         "DtxName": "YS",
-        "LoadPos": 395.0005,
-        "AcqPos": 158.000187
+        "LoadPos": 251.16925,
+        "AcqPos": 146.421437
     },
     "CNC_2": {
         "DtxName": "ZS",
-        "LoadPos": 267.793938,
-        "AcqPos": 436.723875
+        "LoadPos": 267.793962,
+        "AcqPos": 96.466466
     },
     "CNC_3": {
         "DtxName": "RS",
@@ -181,14 +188,14 @@
     "CNC_4": {
         "DtxName": "XD",
         "LoadPos": 0.0,
-        "AcqPos": 0.0
+        "AcqPos": -0.4
     },
     "Axis": {
         "XSample": 0.0,
-        "YSample": 158.000187,
-        "ZSample": 436.723875,
+        "YSample": 146.421437,
+        "ZSample": 96.466466,
         "RSample": 0.0,
-        "XDetector": 0.0
+        "XDetector": -0.4
     },
     "AcqSrvManager": {
         "RecvPcIp": "",
