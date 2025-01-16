@@ -327,139 +327,143 @@ def check_and_remount_share(config_path='/root/.smbcredentials'):
 
 def main():
     """Main execution function."""
-    try:
-        logger.info("Starting PCA parser service")
-        
-        # Read config
-        config = configparser.ConfigParser()
-        config_path = '/opt/pca_parser/config.ini'
-        logger.info(f"Reading config from: {config_path}")
-        
-        if not os.path.exists(config_path):
-            raise FileNotFoundError(f"Config file not found: {config_path}")
+    while True:  # Outer loop for continuous service
+        try:
+            logger.info("Starting PCA parser service")
             
-        config.read(config_path)
-        
-        # Set up paths
-        input_dir = config['Paths']['input_dir']
-        output_dir = config['Paths']['output_dir']
-        archive_dir = config['Paths']['archive_dir']
-        network_share = config['Paths'].get('network_share', '/mnt/windows_share')
-        
-        # Verify directories exist and are accessible
-        for path in [input_dir, output_dir, archive_dir, network_share]:
-            if not os.path.exists(path):
-                logger.info(f"Creating directory: {path}")
-                os.makedirs(path, exist_ok=True)
-            # Test directory permissions
-            if not os.access(path, os.R_OK | os.W_OK):
-                logger.error(f"Insufficient permissions for directory: {path}")
-                raise PermissionError(f"Cannot read/write to {path}")
-            logger.info(f"Directory verified: {path} (readable: {os.access(path, os.R_OK)}, writable: {os.access(path, os.W_OK)})")
-        
-        # Create handler with config
-        event_handler = FileHandler(input_dir, output_dir, archive_dir, config)
-        
-        # Set up observers
-        observers = []
-        
-        # Local input directory observer
-        logger.info(f"Setting up local directory monitoring: {input_dir}")
-        observer_local = Observer()
-        observer_local.schedule(event_handler, input_dir, recursive=False)
-        observers.append(observer_local)
-        
-        # Network share observer
-        if os.path.ismount(network_share):
-            logger.info(f"Setting up network share monitoring: {network_share}")
-            try:
-                # Use PollingObserver for network share
-                observer_network = PollingObserver(timeout=2)  # 2 second polling interval
-                observer_network.schedule(event_handler, network_share, recursive=False)
-                observers.append(observer_network)
-                logger.info("Network share observer scheduled successfully")
-            except Exception as e:
-                logger.error(f"Failed to set up network share observer: {str(e)}\n{traceback.format_exc()}")
-        else:
-            logger.warning(f"Network share not mounted: {network_share}")
-        
-        # Test watchdog on network share
-        if os.path.ismount(network_share):
-            if test_watchdog(network_share):
-                logger.info("Network share watchdog test passed")
-            else:
-                logger.error("Network share watchdog test failed")
-        
-        # Start all observers
-        for observer in observers:
-            observer.start()
-            logger.info(f"Started observer for paths: {[w.path for w in observer._watches]}")
-        
-        logger.info("File monitoring started")
-        
-        # Track last mount check time
-        last_mount_check = datetime.datetime.now()
-        mount_check_interval = datetime.timedelta(seconds=15)  # Check every 15 seconds
-        
-        # Keep the script running
-        while True:
-            time.sleep(1)
+            # Read config
+            config = configparser.ConfigParser()
+            config_path = '/opt/pca_parser/config.ini'
+            logger.info(f"Reading config from: {config_path}")
             
-            # Check mount status periodically
-            now = datetime.datetime.now()
-            if now - last_mount_check > mount_check_interval:
-                last_mount_check = now
-                
-                # Check and remount if needed
-                if not check_and_remount_share():
-                    logger.warning("Mount check failed, will retry in 15 seconds")
-                    # Force observer restart on next successful mount
-                    for observer in observers:
-                        try:
-                            observer.stop()
-                        except Exception as e:
-                            logger.warning(f"Error stopping observer: {str(e)}")
-                    observers.clear()
-                    continue
-                
-                # If mount was restored, restart observers
-                if not any(observer.is_alive() for observer in observers):
-                    logger.info("Restarting observers after mount recovery")
-                    observers = []
-                    
-                    # Recreate local observer
-                    observer_local = Observer()
-                    observer_local.schedule(event_handler, input_dir, recursive=False)
-                    observers.append(observer_local)
-                    
-                    # Recreate network observer if mount is available
-                    if os.path.ismount(network_share):
-                        observer_network = PollingObserver(timeout=2)
-                        observer_network.schedule(event_handler, network_share, recursive=False)
-                        observers.append(observer_network)
-                    
-                    # Start new observers
-                    for observer in observers:
-                        observer.start()
-                        logger.info(f"Restarted observer for paths: {[w.path for w in observer._watches]}")
+            if not os.path.exists(config_path):
+                raise FileNotFoundError(f"Config file not found: {config_path}")
             
-            # Check if observers are alive
-            if not any(observer.is_alive() for observer in observers):
-                logger.error("All observers died, attempting recovery")
-                # Try to restart observers instead of raising error
+            config.read(config_path)
+            
+            # Set up paths
+            input_dir = config['Paths']['input_dir']
+            output_dir = config['Paths']['output_dir']
+            archive_dir = config['Paths']['archive_dir']
+            network_share = config['Paths'].get('network_share', '/mnt/windows_share')
+            
+            # Verify directories exist and are accessible
+            for path in [input_dir, output_dir, archive_dir, network_share]:
+                if not os.path.exists(path):
+                    logger.info(f"Creating directory: {path}")
+                    os.makedirs(path, exist_ok=True)
+                # Test directory permissions
+                if not os.access(path, os.R_OK | os.W_OK):
+                    logger.error(f"Insufficient permissions for directory: {path}")
+                    raise PermissionError(f"Cannot read/write to {path}")
+                logger.info(f"Directory verified: {path} (readable: {os.access(path, os.R_OK)}, writable: {os.access(path, os.W_OK)})")
+            
+            # Create handler with config
+            event_handler = FileHandler(input_dir, output_dir, archive_dir, config)
+            
+            # Set up observers
+            observers = []
+            
+            # Local input directory observer
+            logger.info(f"Setting up local directory monitoring: {input_dir}")
+            observer_local = Observer()
+            observer_local.schedule(event_handler, input_dir, recursive=False)
+            observers.append(observer_local)
+            
+            # Network share observer
+            if os.path.ismount(network_share):
+                logger.info(f"Setting up network share monitoring: {network_share}")
                 try:
-                    for observer in observers:
-                        if not observer.is_alive():
-                            observer.start()
-                    if not any(observer.is_alive() for observer in observers):
-                        raise RuntimeError("Failed to restart observers")
-                except Exception as restart_error:
-                    logger.error(f"Observer restart failed: {str(restart_error)}")
-                    raise RuntimeError("Observer restart failed")
+                    # Use PollingObserver for network share
+                    observer_network = PollingObserver(timeout=2)  # 2 second polling interval
+                    observer_network.schedule(event_handler, network_share, recursive=False)
+                    observers.append(observer_network)
+                    logger.info("Network share observer scheduled successfully")
+                except Exception as e:
+                    logger.error(f"Failed to set up network share observer: {str(e)}\n{traceback.format_exc()}")
+            else:
+                logger.warning(f"Network share not mounted: {network_share}")
+            
+            # Test watchdog on network share
+            if os.path.ismount(network_share):
+                if test_watchdog(network_share):
+                    logger.info("Network share watchdog test passed")
+                else:
+                    logger.error("Network share watchdog test failed")
+            
+            # Track last mount check time
+            last_mount_check = datetime.datetime.now()
+            mount_check_interval = datetime.timedelta(seconds=15)  # Check every 15 seconds
+            
+            # Inner service loop
+            while True:
+                time.sleep(1)
                 
-    except Exception as e:
-        logger.error(f"Fatal error: {str(e)}\n{traceback.format_exc()}")
-        raise
+                # Check mount status periodically
+                now = datetime.datetime.now()
+                if now - last_mount_check > mount_check_interval:
+                    last_mount_check = now
+                    
+                    # Check and remount if needed
+                    if not check_and_remount_share():
+                        logger.warning("Mount check failed, will retry in 15 seconds")
+                        # Force observer restart on next successful mount
+                        for observer in observers:
+                            try:
+                                observer.stop()
+                            except Exception as e:
+                                logger.warning(f"Error stopping observer: {str(e)}")
+                        observers.clear()
+                        continue
+                    
+                    # If mount was restored, restart observers
+                    if not any(observer.is_alive() for observer in observers):
+                        logger.info("Restarting observers after mount recovery")
+                        try:
+                            # Stop any existing observers
+                            for observer in observers:
+                                try:
+                                    observer.stop()
+                                except Exception as e:
+                                    logger.warning(f"Error stopping observer: {str(e)}")
+                            
+                            observers.clear()
+                            
+                            # Recreate local observer
+                            observer_local = Observer()
+                            observer_local.schedule(event_handler, input_dir, recursive=False)
+                            observers.append(observer_local)
+                            
+                            # Recreate network observer if mount is available
+                            if os.path.ismount(network_share):
+                                observer_network = PollingObserver(timeout=2)
+                                observer_network.schedule(event_handler, network_share, recursive=False)
+                                observers.append(observer_network)
+                            
+                            # Start new observers
+                            for observer in observers:
+                                observer.start()
+                                logger.info(f"Restarted observer for paths: {[w.path for w in observer._watches]}")
+                        except Exception as restart_error:
+                            logger.error(f"Failed to restart observers: {str(restart_error)}")
+                            # Don't raise, let the loop retry
+                            continue
+                
+                # Check if observers are alive
+                if not any(observer.is_alive() for observer in observers):
+                    logger.error("All observers died, attempting recovery")
+                    raise RuntimeError("Observer died")  # This will trigger outer loop restart
+                    
+        except Exception as e:
+            logger.error(f"Service error, restarting in 5 seconds: {str(e)}\n{traceback.format_exc()}")
+            # Stop any existing observers
+            try:
+                for observer in observers:
+                    observer.stop()
+            except Exception:
+                pass
+            time.sleep(5)  # Wait before restart
+            continue  # Restart the service
 
 if __name__ == "__main__":
     main()
