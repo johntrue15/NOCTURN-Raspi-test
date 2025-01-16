@@ -11,6 +11,8 @@ from watchdog.events import FileSystemEventHandler
 from watchdog.observers.polling import PollingObserver
 import time
 from git import Repo
+import re
+import datetime
 
 # Configure logging
 logging.basicConfig(
@@ -266,6 +268,39 @@ def test_watchdog(path):
         logger.error(f"Watchdog test failed: {str(e)}\n{traceback.format_exc()}")
         return False
 
+def check_and_remount_share(config_path='/root/.smbcredentials'):
+    """Check mount status and attempt remount if needed"""
+    try:
+        # Check if share is mounted
+        if not os.path.ismount('/mnt/windows_share'):
+            logger.warning("Share not mounted, attempting remount...")
+            
+            # Read IP from fstab
+            with open('/etc/fstab', 'r') as f:
+                fstab_content = f.read()
+                ip_match = re.search(r'//(\d+\.\d+\.\d+\.\d+)/NOCTURN', fstab_content)
+                if not ip_match:
+                    raise Exception("Could not find Windows IP in fstab")
+                windows_ip = ip_match.group(1)
+            
+            # Try unmounting first in case it's in a bad state
+            os.system('umount -f /mnt/windows_share 2>/dev/null')
+            
+            # Attempt remount
+            mount_cmd = f"mount -t cifs //{windows_ip}/NOCTURN /mnt/windows_share -o credentials={config_path},iocharset=utf8,dir_mode=0777,file_mode=0777"
+            result = os.system(mount_cmd)
+            
+            if result == 0:
+                logger.info("Successfully remounted share")
+                return True
+            else:
+                logger.error("Failed to remount share")
+                return False
+        return True
+    except Exception as e:
+        logger.error(f"Error in remount attempt: {str(e)}\n{traceback.format_exc()}")
+        return False
+
 def main():
     """Main execution function."""
     try:
@@ -331,33 +366,50 @@ def main():
             else:
                 logger.error("Network share watchdog test failed")
         
-        # Start all observers
-        for observer in observers:
-            observer.start()
-            logger.info(f"Started observer for paths: {[w.path for w in observer._watches]}")
-            
-        logger.info("File monitoring started")
-        
-        # Read Git configuration
-        git_token = config['Git']['PERSONAL_ACCESS_TOKEN']
-        git_username = config['Git']['USERNAME']
-        git_branch = config['Git']['BRANCH']
-        
-        # Update Git remote URL with token
-        repo_dir = "/opt/pca_parser/gitrepo"
-        repo = Repo(repo_dir)
-        repo.git.remote('set-url', 'origin', 
-            f"https://{git_token}@github.com/{git_username}/NOCTURN-Raspi-test.git")
+        # Track last mount check time
+        last_mount_check = datetime.datetime.now()
+        mount_check_interval = datetime.timedelta(minutes=1)  # Check every minute
         
         # Keep the script running
         while True:
             time.sleep(1)
-            # Verify observers are still running
-            for observer in observers:
-                if not observer.is_alive():
-                    logger.error("Observer died, restarting service")
-                    raise RuntimeError("Observer died")
             
+            # Check mount status periodically
+            now = datetime.datetime.now()
+            if now - last_mount_check > mount_check_interval:
+                last_mount_check = now
+                
+                # Check and remount if needed
+                if not check_and_remount_share():
+                    logger.warning("Mount check failed, will retry in 1 minute")
+                    continue
+                
+                # If mount was restored, restart observers
+                if not any(observer.is_alive() for observer in observers):
+                    logger.info("Restarting observers after mount recovery")
+                    observers = []
+                    
+                    # Recreate local observer
+                    observer_local = Observer()
+                    observer_local.schedule(event_handler, input_dir, recursive=False)
+                    observers.append(observer_local)
+                    
+                    # Recreate network observer if mount is available
+                    if os.path.ismount(network_share):
+                        observer_network = PollingObserver(timeout=2)
+                        observer_network.schedule(event_handler, network_share, recursive=False)
+                        observers.append(observer_network)
+                    
+                    # Start new observers
+                    for observer in observers:
+                        observer.start()
+                        logger.info(f"Restarted observer for paths: {[w.path for w in observer._watches]}")
+            
+            # Check if observers are alive
+            if not any(observer.is_alive() for observer in observers):
+                logger.error("All observers died, attempting recovery")
+                raise RuntimeError("Observer died")
+                
     except Exception as e:
         logger.error(f"Fatal error: {str(e)}\n{traceback.format_exc()}")
         raise
