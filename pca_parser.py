@@ -78,9 +78,11 @@ class FileHandler(FileSystemEventHandler):
             try:
                 with open(file_path, 'r') as pca_file:
                     pca_data = pca_file.read()
+                    logger.debug(f"Raw PCA data:\n{pca_data}")  # Add debug logging
                     
                 # Parse PCA data and convert to JSON
                 json_data = self.convert_pca_to_json(pca_data)
+                logger.debug(f"Converted JSON data:\n{json.dumps(json_data, indent=4)}")  # Add debug logging
                 
                 # Save JSON file
                 json_filename = os.path.splitext(filename)[0] + '.json'
@@ -151,7 +153,7 @@ class FileHandler(FileSystemEventHandler):
         """Convert PCA data to JSON format using configparser"""
         try:
             # Create a ConfigParser instance
-            parser = configparser.ConfigParser()
+            parser = configparser.ConfigParser(interpolation=None)  # Disable interpolation
             parser.optionxform = str  # Preserve case in keys
             
             # Read PCA data from string
@@ -164,10 +166,14 @@ class FileHandler(FileSystemEventHandler):
                 for key, value in parser.items(section):
                     try:
                         # Convert to float if decimal point present, else try integer
-                        if "." in value:
+                        if "." in value and not value.endswith('.tif'):  # Skip .tif files
                             section_dict[key] = float(value)
                         else:
-                            section_dict[key] = int(value)
+                            try:
+                                section_dict[key] = int(value)
+                            except ValueError:
+                                # Keep as string if conversion fails
+                                section_dict[key] = value
                     except ValueError:
                         # Keep as string if conversion fails
                         section_dict[key] = value
