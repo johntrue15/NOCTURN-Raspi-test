@@ -24,10 +24,11 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 class FileHandler(FileSystemEventHandler):
-    def __init__(self, input_dir, output_dir, archive_dir):
+    def __init__(self, input_dir, output_dir, archive_dir, config):
         self.input_dir = input_dir
         self.output_dir = output_dir
         self.archive_dir = archive_dir
+        self.config = config  # Store config
         self.processed_files = set()  # Track processed files
         logger.info(f"Initialized handler with: input={input_dir}, output={output_dir}, archive={archive_dir}")
 
@@ -121,7 +122,7 @@ class FileHandler(FileSystemEventHandler):
                     
                     # Git add, commit, and push
                     repo = Repo(repo_dir)
-                    repo.git.config('--local', 'user.name', config['Git']['USERNAME'])
+                    repo.git.config('--local', 'user.name', self.config['Git']['USERNAME'])
                     repo.git.config('--local', 'user.email', 'jtrue15@ufl.edu')
                     repo.git.add(A=True)
                     
@@ -129,7 +130,7 @@ class FileHandler(FileSystemEventHandler):
                         commit_message = "Auto-commit: PCA to JSON updates"
                         repo.index.commit(commit_message)
                         origin = repo.remote('origin')
-                        origin.push(config['Git']['BRANCH'])
+                        origin.push(self.config['Git']['BRANCH'])
                         logger.info(f"Git: Committed and pushed {json_filename}")
                     else:
                         logger.info("No changes to commit")
@@ -243,8 +244,8 @@ def main():
                 raise PermissionError(f"Cannot read/write to {path}")
             logger.info(f"Directory verified: {path} (readable: {os.access(path, os.R_OK)}, writable: {os.access(path, os.W_OK)})")
         
-        # Create handler
-        event_handler = FileHandler(input_dir, output_dir, archive_dir)
+        # Create handler with config
+        event_handler = FileHandler(input_dir, output_dir, archive_dir, config)
         
         # Set up observers
         observers = []
