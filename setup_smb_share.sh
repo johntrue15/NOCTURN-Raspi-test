@@ -18,9 +18,13 @@ get_smb_details() {
     # Remove any existing entry for this mount point
     sed -i '\#/mnt/windows_share#d' /etc/fstab
     
+    # First, try to list available shares for debugging
+    echo "Attempting to list available shares..."
+    smbclient -L $windows_ip -N
+    
     # Add entry to fstab for persistent mount
     echo "Adding mount to /etc/fstab..."
-    MOUNT_LINE="//$windows_ip/Users/DELL_/OneDrive/Documents/NOCTURN /mnt/windows_share cifs guest,noperm,iocharset=utf8,file_mode=0777,dir_mode=0777 0 0"
+    MOUNT_LINE="//$windows_ip/nocturn /mnt/windows_share cifs vers=2.0,guest,noperm,rw,iocharset=utf8,file_mode=0777,dir_mode=0777 0 0"
     echo "Debug: Mount line: $MOUNT_LINE"
     echo "$MOUNT_LINE" >> /etc/fstab
     
@@ -35,6 +39,8 @@ get_smb_details() {
         return 0
     else
         echo "Failed to mount SMB share. Please check your settings."
+        echo "Trying direct mount command for debugging..."
+        mount -t cifs "//$windows_ip/nocturn" /mnt/windows_share -o vers=2.0,guest,noperm,rw
         dmesg | tail -n 5  # Show recent kernel messages for debugging
         return 1
     fi
@@ -43,7 +49,7 @@ get_smb_details() {
 # Install required packages
 echo "Installing required packages..."
 apt-get update
-apt-get install -y cifs-utils
+apt-get install -y cifs-utils smbclient
 
 # Setup SMB share
 get_smb_details 
