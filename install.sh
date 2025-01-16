@@ -18,7 +18,7 @@ apt-get update -y
 apt-get install -y python3 python3-pip git
 
 echo "Installing Python dependencies..."
-pip3 install gitpython configparser
+pip3 install gitpython configparser watchdog
 
 # Define installation directory and create structure
 INSTALL_DIR="/opt/pca_parser"

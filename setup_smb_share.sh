@@ -6,6 +6,24 @@ if [ "$EUID" -ne 0 ]; then
     exit 1
 fi
 
+# Add at the beginning after root check
+echo "Verifying SMB dependencies..."
+if ! command -v mount.cifs >/dev/null 2>&1; then
+    echo "Installing cifs-utils..."
+    apt-get update
+    apt-get install -y cifs-utils
+fi
+
+if ! command -v smbclient >/dev/null 2>&1; then
+    echo "Installing smbclient..."
+    apt-get install -y smbclient
+fi
+
+if ! pip3 show watchdog >/dev/null 2>&1; then
+    echo "Installing watchdog..."
+    pip3 install watchdog
+fi
+
 # Function to prompt for SMB details
 get_smb_details() {
     # Debug output to verify IP

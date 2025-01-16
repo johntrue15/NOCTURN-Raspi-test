@@ -6,6 +6,18 @@ if [ "$EUID" -ne 0 ]; then
     exit 1
 fi
 
+# Add at the beginning after root check
+echo "Verifying Git dependencies..."
+if ! pip3 show gitpython >/dev/null 2>&1; then
+    echo "Installing gitpython..."
+    pip3 install gitpython
+fi
+
+if ! pip3 show configparser >/dev/null 2>&1; then
+    echo "Installing configparser..."
+    pip3 install configparser
+fi
+
 # Function to prompt for GitHub token
 get_github_token() {
     while true; do
