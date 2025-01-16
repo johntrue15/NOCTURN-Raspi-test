@@ -11,28 +11,27 @@
     },
     "Geometry": {
         "FDD": 802.77534791,
-        "FOD": 436.723875,
-        "Magnification": 1.83817601,
-        "VoxelSizeX": 0.10880351,
-        "VoxelSizeY": 0.10880351,
-        "CalibValue": -0.916,
+        "FOD": 146.6994375,
+        "Magnification": 5.47224558,
+        "VoxelSizeX": 0.03654807,
+        "VoxelSizeY": 0.03654807,
+        "CalibValue": 0.0,
         "cx": 1011.5,
         "cy": 1011.5,
         "DetectorRot": 0.0,
-        "Tilt": 0.0,
-        "Old_CalibValue": 0.0
+        "Tilt": 0.0
     },
     "CT": {
-        "Type": 0,
-        "NumberImages": 2800,
-        "StartImg": 2801,
+        "Type": 4,
+        "NumberImages": 1800,
+        "StartImg": 1801,
         "RotationSector": 360.0,
         "NoRotation": 0,
         "EstimatedTime": 0,
-        "RemainingTime": 2800,
-        "ScanTimeCmpl": 2800,
-        "NrImgDone": 2801,
-        "NrImgCmplScan": 2801,
+        "RemainingTime": 1800,
+        "ScanTimeCmpl": 1800,
+        "NrImgDone": 1801,
+        "NrImgCmplScan": 1801,
         "RefDriveEnabled": 0,
         "SkipForNewInterval": 25,
         "SkipAcc": 1,
@@ -41,7 +40,7 @@
         "Wnd_T": 0,
         "Wnd_R": 10,
         "Wnd_B": 10,
-        "Level": 7854.0
+        "Level": 2465.0
     },
     "VSensor": {
         "EnableTiles": 1,
@@ -71,7 +70,7 @@
         "DimX": 2024,
         "DimY": 2024,
         "Rotation": 0,
-        "FreeRay": 7993
+        "FreeRay": 5845
     },
     "ImgProc": {
         "SwBin": 1,
@@ -82,11 +81,18 @@
         "Counter": 0,
         "MaxTimes": 10,
         "TimeTrigOn": 0,
-        "kV": 225,
+        "kV": 195,
         "Time": 60
     },
     "Multiscan": {
-        "Active": 0
+        "Active": 1,
+        "Axis": 1,
+        "NrScans": 3,
+        "ActNrScans": 3,
+        "Dist": 35.23233695,
+        "VoxShiftPerScan": 964,
+        "Direction": 1,
+        "NrScansBefRef": 10
     },
     "Helixscan": {
         "Active": 0
@@ -97,11 +103,11 @@
         "Skip": 10,
         "EnableAutoAcq": 1,
         "MGainVoltage": "220:220:220:",
-        "MGainCurrent": "400:440:450:",
+        "MGainCurrent": "130:140:150:",
         "MGainFilter": "__Unknown__:__Unknown__:__Unknown__:",
         "GainImg": "",
-        "MGainImg": "S:\\CT_DATA\\FICS\\NEW\\4K TV PCB\\TV Vizio PCB_bright_220kV_450uA_333ms_1Det.tif",
-        "OffsetImg": "S:\\CT_DATA\\FICS\\NEW\\4K TV PCB\\TV Vizio PCB_Dark_333.tif",
+        "MGainImg": "C:\\Program Files\\phoenix x-ray\\datosx 2 acq\\CalibrationImages\\G_B1_G200_T333_V1.tif",
+        "OffsetImg": "C:\\Program Files\\phoenix x-ray\\datosx 2 acq\\CalibrationImages\\offset_B1x1_G200.0%_T333ms.tif",
         "DefPixelImg": "C:\\Program Files\\phoenix x-ray\\datosx 2 acq\\CalibrationImages\\pixmask_B1x1_x2024_y2024.tif"
     },
     "SectorScan": {
@@ -120,10 +126,10 @@
         "Timing": 3,
         "TimingVal": 333.096,
         "Avg": 4,
-        "Skip": 1,
+        "Skip": 2,
         "Binning": 0,
         "BitPP": 16,
-        "CameraGain": 1,
+        "CameraGain": 2,
         "SatValue": 15563,
         "SatPixNrLimit": 4096
     },
@@ -132,12 +138,12 @@
         "Name": "xs|240 d",
         "ID": 2476,
         "InitTimeout": 20000,
-        "Voltage": 220,
-        "Current": 450,
+        "Voltage": 190,
+        "Current": 190,
         "Mode": 0,
-        "Filter": "0.5Cu",
+        "Filter": "0.1Cu",
         "Target": "Undefined",
-        "FocalSpotSize": 99.0,
+        "FocalSpotSize": 36.1,
         "Collimation": -1,
         "WaitTime": 1000,
         "WaitForStable": 20000,
@@ -160,18 +166,18 @@
     },
     "CNC_0": {
         "DtxName": "XS",
-        "LoadPos": -149.856813,
+        "LoadPos": -150.000563,
         "AcqPos": 0.0
     },
     "CNC_1": {
         "DtxName": "YS",
         "LoadPos": 395.0005,
-        "AcqPos": 158.000187
+        "AcqPos": 218.023611
     },
     "CNC_2": {
         "DtxName": "ZS",
-        "LoadPos": 267.793938,
-        "AcqPos": 436.723875
+        "LoadPos": 267.176625,
+        "AcqPos": 146.699437
     },
     "CNC_3": {
         "DtxName": "RS",
@@ -180,13 +186,13 @@
     },
     "CNC_4": {
         "DtxName": "XD",
-        "LoadPos": 0.0,
+        "LoadPos": -0.097375,
         "AcqPos": 0.0
     },
     "Axis": {
         "XSample": 0.0,
-        "YSample": 158.000187,
-        "ZSample": 436.723875,
+        "YSample": 218.023611,
+        "ZSample": 146.699437,
         "RSample": 0.0,
         "XDetector": 0.0
     },
@@ -196,8 +202,5 @@
     },
     "Net": {
         "IP": ""
-    },
-    "BHC_Values": {
-        "BHC_Param": 7
     }
 }
