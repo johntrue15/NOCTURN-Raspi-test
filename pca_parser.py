@@ -125,16 +125,19 @@ class FileHandler(FileSystemEventHandler):
                     repo = Repo(repo_dir)
                     repo.git.config('--local', 'user.name', self.config['Git']['USERNAME'])
                     repo.git.config('--local', 'user.email', 'jtrue15@ufl.edu')
-                    repo.git.add(A=True)
                     
-                    if repo.is_dirty(untracked_files=True):
-                        commit_message = "Auto-commit: PCA to JSON updates"
+                    # Only add the specific JSON file
+                    repo.git.add(repo_json_path)
+                    
+                    # Check if there are changes to the specific file
+                    if repo.git.diff('--cached', '--name-only'):
+                        commit_message = f"Auto-commit: Added {json_filename}"
                         repo.index.commit(commit_message)
                         origin = repo.remote('origin')
                         origin.push(self.config['Git']['BRANCH'])
                         logger.info(f"Git: Committed and pushed {json_filename}")
                     else:
-                        logger.info("No changes to commit")
+                        logger.info(f"No changes to {json_filename}")
                         
                 except Exception as git_error:
                     logger.error(f"Git operation failed: {str(git_error)}\n{traceback.format_exc()}")
