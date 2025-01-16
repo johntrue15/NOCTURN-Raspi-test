@@ -31,13 +31,39 @@ class FileHandler(FileSystemEventHandler):
     def on_created(self, event):
         if event.is_directory:
             return
+        logger.info(f"File created event detected: {event.src_path}")
+        self.process_file(event.src_path)
+
+    def on_modified(self, event):
+        if event.is_directory:
+            return
+        logger.info(f"File modified event detected: {event.src_path}")
         self.process_file(event.src_path)
 
     def process_file(self, file_path):
         try:
             logger.info(f"Processing file: {file_path}")
+            if not file_path.endswith('.pca'):
+                logger.info(f"Skipping non-PCA file: {file_path}")
+                return
+
+            filename = os.path.basename(file_path)
+            logger.info(f"Processing PCA file: {filename}")
+
+            # If file is from network share, copy to input directory
+            if '/mnt/windows_share' in file_path:
+                logger.info(f"File from network share, copying to input directory")
+                local_path = os.path.join(self.input_dir, filename)
+                shutil.copy2(file_path, local_path)
+                logger.info(f"Copied to: {local_path}")
+                # Remove original file from share
+                os.remove(file_path)
+                logger.info(f"Removed original file from share")
+                file_path = local_path
+
             # Your existing processing logic here
-            pass
+            logger.info(f"File processing complete: {filename}")
+
         except Exception as e:
             logger.error(f"Error processing file {file_path}: {str(e)}\n{traceback.format_exc()}")
 
