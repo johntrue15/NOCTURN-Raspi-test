@@ -2,58 +2,83 @@
 #
 # install.sh
 #
-# Installs the pca_parser systemd service from this repo.
-
+# Installs the pca_parser systemd service
 set -e  # Exit immediately if a command exits with a non-zero status.
 
-echo "Installing dependencies..."
-sudo apt-get update -y
-sudo apt-get install -y python3 python3-pip git
+echo "Starting installation of PCA Parser Service..."
 
-echo "Installing Python libraries (gitpython, configparser)..."
-sudo pip3 install gitpython configparser
+# Check if running as root
+if [ "$EUID" -ne 0 ]; then 
+    echo "Please run as root (use sudo)"
+    exit 1
+fi
 
-# Define install directory
+echo "Installing system dependencies..."
+apt-get update -y
+apt-get install -y python3 python3-pip git
+
+echo "Installing Python dependencies..."
+pip3 install gitpython configparser
+
+# Define installation directory and create structure
 INSTALL_DIR="/opt/pca_parser"
+echo "Creating directory structure in $INSTALL_DIR..."
 
-# Copy files to /opt/pca_parser
-echo "Creating $INSTALL_DIR..."
-sudo mkdir -p "$INSTALL_DIR"
+# Create all required directories
+mkdir -p "$INSTALL_DIR"
+mkdir -p "$INSTALL_DIR/input"
+mkdir -p "$INSTALL_DIR/output"
+mkdir -p "$INSTALL_DIR/archive"
+mkdir -p "$INSTALL_DIR/gitrepo"
 
-echo "Copying files to $INSTALL_DIR..."
-# Adjust as needed if you have more files
-sudo cp pca_parser.py "$INSTALL_DIR/pca_parser.py"
-sudo cp config.ini "$INSTALL_DIR/config.ini"
-sudo chmod +x "$INSTALL_DIR/pca_parser.py"
+# Set proper permissions
+chown -R root:root "$INSTALL_DIR"
+chmod -R 755 "$INSTALL_DIR"
+
+echo "Copying program files..."
+cp pca_parser.py "$INSTALL_DIR/pca_parser.py"
+cp config.ini "$INSTALL_DIR/config.ini"
+chmod +x "$INSTALL_DIR/pca_parser.py"
 
 # Create systemd service file
-echo "Creating systemd service at /etc/systemd/system/pca_parser.service..."
-SERVICE_FILE="/etc/systemd/system/pca_parser.service"
-sudo bash -c "cat > $SERVICE_FILE" <<EOF
+echo "Creating systemd service..."
+cat > /etc/systemd/system/pca_parser.service << 'EOF'
 [Unit]
 Description=PCA Parser Service
 After=network.target
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/python3 $INSTALL_DIR/pca_parser.py
+ExecStart=/usr/bin/python3 /opt/pca_parser/pca_parser.py
 Restart=always
 RestartSec=10
-WorkingDirectory=$INSTALL_DIR
+WorkingDirectory=/opt/pca_parser
+User=root
+Group=root
+StandardOutput=append:/var/log/pca_parser.log
+StandardError=append:/var/log/pca_parser.error.log
 
 [Install]
 WantedBy=multi-user.target
 EOF
 
-echo "Reloading systemd..."
-sudo systemctl daemon-reload
+# Create log files and set permissions
+touch /var/log/pca_parser.log
+touch /var/log/pca_parser.error.log
+chmod 644 /var/log/pca_parser.log
+chmod 644 /var/log/pca_parser.error.log
 
-echo "Enabling pca_parser service..."
-sudo systemctl enable pca_parser.service
+echo "Reloading systemd daemon..."
+systemctl daemon-reload
 
-echo "Starting pca_parser service..."
-sudo systemctl start pca_parser.service
+echo "Enabling and starting service..."
+systemctl enable pca_parser.service
+systemctl start pca_parser.service
 
 echo "Installation complete!"
-echo "Service status:"
-sudo systemctl status pca_parser.service --no-pager
+echo "You can monitor the service using:"
+echo "  systemctl status pca_parser.service"
+echo "  journalctl -u pca_parser.service -f"
+echo "Log files are located at:"
+echo "  /var/log/pca_parser.log"
+echo "  /var/log/pca_parser.error.log"
