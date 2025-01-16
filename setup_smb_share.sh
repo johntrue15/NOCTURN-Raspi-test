@@ -12,6 +12,11 @@ get_smb_details() {
     read -p "Enter Windows PC IP address: " windows_ip
     echo "Debug: Using IP address: $windows_ip"
     
+    # Get Windows credentials
+    read -p "Enter Windows username (DELL_): " win_user
+    read -s -p "Enter Windows password: " win_pass
+    echo ""
+    
     # Create mount point
     mkdir -p /mnt/windows_share
     
@@ -30,34 +35,28 @@ get_smb_details() {
         return 1
     fi
     
-    # Method 2: List shares with different protocols
-    echo "Attempting to list shares (SMB1)..."
-    smbclient -L $windows_ip -N -m SMB1
-    echo "Attempting to list shares (SMB2)..."
-    smbclient -L $windows_ip -N -m SMB2
-    echo "Attempting to list shares (SMB3)..."
-    smbclient -L $windows_ip -N -m SMB3
+    # Create credentials file
+    echo "username=$win_user" > /root/.smbcredentials
+    echo "password=$win_pass" >> /root/.smbcredentials
+    chmod 600 /root/.smbcredentials
     
     # Try different mount options
     echo "Trying different mount options..."
     
     # Array of different mount options to try
     MOUNT_OPTIONS=(
-        "vers=1.0,guest,noperm,rw,iocharset=utf8"
-        "vers=2.0,guest,noperm,rw,iocharset=utf8"
-        "vers=3.0,guest,noperm,rw,iocharset=utf8"
-        "vers=1.0,guest,sec=none,noperm,rw"
-        "vers=2.0,guest,sec=none,noperm,rw"
-        "vers=3.0,guest,sec=none,noperm,rw"
+        "vers=2.0,credentials=/root/.smbcredentials,iocharset=utf8,dir_mode=0777,file_mode=0777"
+        "vers=3.0,credentials=/root/.smbcredentials,iocharset=utf8,dir_mode=0777,file_mode=0777"
+        "vers=2.1,credentials=/root/.smbcredentials,iocharset=utf8,dir_mode=0777,file_mode=0777"
     )
     
     # Try each mount option
     for options in "${MOUNT_OPTIONS[@]}"; do
         echo "Trying mount with options: $options"
-        if mount -t cifs "//$windows_ip/nocturn" /mnt/windows_share -o "$options" 2>/dev/null; then
+        if mount -t cifs "//$windows_ip/NOCTURN" /mnt/windows_share -o "$options" 2>/dev/null; then
             echo "Mount successful with options: $options"
             # Add successful mount to fstab
-            echo "//$windows_ip/nocturn /mnt/windows_share cifs $options 0 0" >> /etc/fstab
+            echo "//$windows_ip/NOCTURN /mnt/windows_share cifs $options 0 0" >> /etc/fstab
             return 0
         else
             echo "Mount failed with these options"
