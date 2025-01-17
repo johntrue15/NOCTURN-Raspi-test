@@ -25,6 +25,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+__version__ = '1.0.0'
+
 class FileHandler(FileSystemEventHandler):
     def __init__(self, input_dir, output_dir, archive_dir, config):
         self.input_dir = input_dir
