@@ -88,8 +88,11 @@ jobs:
       id: provenance
       uses: actions/attest-build-provenance@v1
       with:
-        artifact-path: json/${{ steps.get-filename.outputs.filename }}
-        output-path: provenance.att
+        subject-path: json/${{ steps.get-filename.outputs.filename }}
+        subject-name: ${{ steps.get-filename.outputs.filename }}
+        push-to-registry: false
+        show-summary: true
+        github-token: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Create Release
       id: create-release
