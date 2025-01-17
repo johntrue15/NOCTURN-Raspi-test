@@ -17,7 +17,9 @@ on:
 
 permissions:
   contents: write
-  id-token: write # Required for provenance attestation
+  id-token: write  # Required for attestation
+  actions: read    # Required for attestation
+  packages: write  # Required for attestation
 
 jobs:
   create-release:
