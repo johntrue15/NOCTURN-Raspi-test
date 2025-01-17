@@ -3,4 +3,5 @@ pytest==8.0.0
 black==24.1.1
 flake8==7.0.0
 pylint==3.0.3
-coverage==7.4.1 
+coverage==7.4.1
+slsa-verifier==2.0.0  # For SLSA verification 

@@ -10,24 +10,15 @@ on:
         description: 'JSON filename to test'
         required: true
         default: 'Nano Di Side.json'
-      commit_message:
-        description: 'Simulated commit message'
-        required: true
-        default: 'Auto-commit: Added Nano Di Side.json'
 
 permissions:
   contents: write
-  id-token: write  # Required for attestation
-  actions: read    # Required for attestation
-  packages: write  # Required for attestation
+  id-token: write
+  actions: read
 
 jobs:
   create-release:
     runs-on: ubuntu-latest
-    if: |
-      github.event_name == 'workflow_dispatch' ||
-      contains(github.event.head_commit.message, 'Auto-commit: Added')
-    
     steps:
     - uses: actions/checkout@v4
     
@@ -86,15 +77,12 @@ jobs:
         echo "body=$BODY" >> $GITHUB_OUTPUT
         echo "version=${FILENAME%.*}" >> $GITHUB_OUTPUT
 
-    - name: Generate Provenance
-      id: provenance
-      uses: actions/attest-build-provenance@v1
+    - name: Generate SLSA Provenance
+      uses: slsa-framework/slsa-github-generator@v1.9.0
       with:
-        subject-path: json/${{ steps.get-filename.outputs.filename }}
-        subject-name: ${{ steps.get-filename.outputs.filename }}
-        push-to-registry: false
-        show-summary: true
-        github-token: ${{ secrets.GITHUB_TOKEN }}
+        base64-subjects: "${{ hashFiles('json/*.json') }}"
+        provenance-name: "provenance.att"
+        upload-assets: true
 
     - name: Create Release
       id: create-release

@@ -1,0 +1,21 @@
+name: SLSA Configuration
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'json/*.json'
+
+jobs:
+  attest:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: slsa-framework/slsa-github-generator@v1.9.0
+        with:
+          attestation-name: "scan-data"
+          base64-subjects: "${{ hashFiles('json/*.json') }}"
+          provenance-name: "provenance.att" 

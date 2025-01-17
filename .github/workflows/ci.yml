@@ -49,3 +49,11 @@ jobs:
         
         # Test provenance generation
         gh workflow run release.yml 
+
+    - name: Verify SLSA Provenance
+      if: github.event_name == 'pull_request'
+      run: |
+        slsa-verifier verify-artifact \
+          --provenance-path provenance.att \
+          --source-uri "github.com/${{ github.repository }}" \
+          --source-tag "${{ github.ref }}" 
