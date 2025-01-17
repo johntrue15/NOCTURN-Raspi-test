@@ -117,6 +117,8 @@ sudo systemctl restart pca_parser.service
 - Git
 - SMB/CIFS support
 - Network connectivity to Windows share
+  - [GUI Setup Guide](WINDOWS_GUI.md) - Recommended for most users
+  - [Command Line Setup Guide](WINDOWS_CMD.md) - For advanced users
 - GitHub account with personal access token
 
 ## Support
