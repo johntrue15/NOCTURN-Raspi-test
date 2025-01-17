@@ -3,7 +3,17 @@ name: Create Release with Attestation
 on:
   push:
     paths:
-      - 'json/*.json'  # Only trigger on JSON file changes
+      - 'json/*.json'
+  workflow_dispatch:
+    inputs:
+      filename:
+        description: 'JSON filename to test'
+        required: true
+        default: 'Nano Di Side.json'
+      commit_message:
+        description: 'Simulated commit message'
+        required: true
+        default: 'Auto-commit: Added Nano Di Side.json'
 
 permissions:
   contents: write
@@ -13,6 +23,7 @@ jobs:
   create-release:
     runs-on: ubuntu-latest
     if: |
+      github.event_name == 'workflow_dispatch' ||
       contains(github.event.head_commit.message, 'Auto-commit: Added')
     
     steps:
