@@ -285,6 +285,9 @@ def check_and_remount_share(config_path='/root/.smbcredentials'):
             logger.error(f"Windows host {windows_ip} is not responding")
             return False
 
+        # Ensure mount point exists
+        os.makedirs('/mnt/windows_share', exist_ok=True)
+
         # Check if share is mounted AND accessible
         is_mounted = os.path.ismount('/mnt/windows_share')
         can_access = False
@@ -302,31 +305,77 @@ def check_and_remount_share(config_path='/root/.smbcredentials'):
             
             # Force unmount if in bad state
             os.system('umount -f /mnt/windows_share 2>/dev/null')
-            time.sleep(1)  # Wait a moment
+            time.sleep(2)  # Wait longer after unmount
             
-            # Attempt remount
-            mount_cmd = f"mount -t cifs //{windows_ip}/NOCTURN /mnt/windows_share -o credentials={config_path},iocharset=utf8,dir_mode=0777,file_mode=0777"
-            result = os.system(mount_cmd)
+            # Attempt remount with different SMB versions
+            versions = ['3.0', '2.1', '2.0']
+            for vers in versions:
+                mount_cmd = f"mount -t cifs //{windows_ip}/NOCTURN /mnt/windows_share -o vers={vers},credentials={config_path},iocharset=utf8,dir_mode=0777,file_mode=0777"
+                result = os.system(mount_cmd)
+                
+                if result == 0:
+                    # Verify the mount is actually working
+                    try:
+                        os.listdir('/mnt/windows_share')
+                        logger.info(f"Successfully remounted share with SMB {vers}")
+                        return True
+                    except Exception:
+                        logger.warning(f"Mount succeeded but share not accessible with SMB {vers}")
+                        continue
             
-            if result == 0:
-                # Verify the mount is actually working
-                try:
-                    os.listdir('/mnt/windows_share')
-                    logger.info("Successfully remounted share and verified access")
-                    return True
-                except Exception:
-                    logger.error("Mount succeeded but share is not accessible")
-                    return False
-            else:
-                logger.error("Failed to remount share")
-                return False
+            logger.error("Failed to remount share with all SMB versions")
+            return False
+            
         return True
     except Exception as e:
         logger.error(f"Error in remount attempt: {str(e)}\n{traceback.format_exc()}")
         return False
 
+def wait_for_network_and_mount():
+    """Wait for network and mount at boot time"""
+    max_attempts = 12  # 2 minutes total (12 * 10 seconds)
+    attempt = 0
+    
+    while attempt < max_attempts:
+        try:
+            # Read IP from fstab
+            with open('/etc/fstab', 'r') as f:
+                fstab_content = f.read()
+                ip_match = re.search(r'//(\d+\.\d+\.\d+\.\d+)/NOCTURN', fstab_content)
+                if not ip_match:
+                    logger.error("Could not find Windows IP in fstab")
+                    return False
+                windows_ip = ip_match.group(1)
+            
+            # Test network connectivity
+            ping_result = os.system(f"ping -c 1 -W 2 {windows_ip} >/dev/null 2>&1")
+            if ping_result == 0:
+                logger.info(f"Network connection to {windows_ip} established")
+                
+                # Try mounting
+                if check_and_remount_share():
+                    logger.info("Share mounted successfully at boot")
+                    return True
+                else:
+                    logger.warning("Mount failed, will retry...")
+            else:
+                logger.warning(f"No response from {windows_ip}, waiting...")
+                
+        except Exception as e:
+            logger.error(f"Boot-time mount error: {str(e)}")
+        
+        attempt += 1
+        time.sleep(10)  # Wait 10 seconds between attempts
+    
+    logger.error("Failed to establish connection after 2 minutes")
+    return False
+
 def main():
     """Main execution function."""
+    # Add boot-time network and mount check
+    if not wait_for_network_and_mount():
+        logger.error("Initial mount failed, continuing with local-only mode")
+    
     while True:  # Outer loop for continuous service
         try:
             logger.info("Starting PCA parser service")

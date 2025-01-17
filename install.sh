@@ -63,12 +63,14 @@ echo "Creating systemd service..."
 cat > /etc/systemd/system/pca_parser.service << 'EOF'
 [Unit]
 Description=PCA Parser Service
-After=network.target
+After=network-online.target remote-fs.target
+Wants=network-online.target
 StartLimitIntervalSec=300
 StartLimitBurst=5
 
 [Service]
 Type=simple
+ExecStartPre=/bin/bash -c 'until ping -c1 $(grep -oP "//\K[^/]+" /etc/fstab | head -1); do sleep 5; done'
 ExecStart=/usr/bin/python3 /opt/pca_parser/pca_parser.py
 Restart=on-failure
 RestartSec=30
