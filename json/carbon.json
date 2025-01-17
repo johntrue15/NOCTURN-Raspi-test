@@ -1,0 +1,206 @@
+{
+    "General": {
+        "Version": "2.8.2.20099",
+        "Version-pca": 2,
+        "Comment": "",
+        "LoadDefault": 1,
+        "SystemName": "v|tome|x m"
+    },
+    "AutoScO": {
+        "Active": 0
+    },
+    "Geometry": {
+        "FDD": 802.77534791,
+        "FOD": 146.6994375,
+        "Magnification": 5.47224558,
+        "VoxelSizeX": 0.03654807,
+        "VoxelSizeY": 0.03654807,
+        "CalibValue": 0.0,
+        "cx": 1011.5,
+        "cy": 1011.5,
+        "DetectorRot": 0.0,
+        "Tilt": 0.0
+    },
+    "CT": {
+        "Type": 4,
+        "NumberImages": 1800,
+        "StartImg": 1801,
+        "RotationSector": 360.0,
+        "NoRotation": 0,
+        "EstimatedTime": 0,
+        "RemainingTime": 1800,
+        "ScanTimeCmpl": 1800,
+        "NrImgDone": 1801,
+        "NrImgCmplScan": 1801,
+        "RefDriveEnabled": 0,
+        "SkipForNewInterval": 25,
+        "SkipAcc": 1,
+        "FreeRayFactor": 1.0001,
+        "Wnd_L": 0,
+        "Wnd_T": 0,
+        "Wnd_R": 10,
+        "Wnd_B": 10,
+        "Level": 2465.0
+    },
+    "VSensor": {
+        "EnableTiles": 1,
+        "Start": 0,
+        "NumTiles": 1,
+        "Interval": 60,
+        "Overlap": 9,
+        "AdjustImg": 1,
+        "SingleImgX": 2024
+    },
+    "Trajectory": {
+        "Active": 0
+    },
+    "CalibValue": {
+        "NumberImages": 18,
+        "Averaging": 2,
+        "Skip": 3
+    },
+    "FastCT": {
+        "Active": 0
+    },
+    "Image": {
+        "Top": 0,
+        "Left": 0,
+        "Bottom": 2023,
+        "Right": 2023,
+        "DimX": 2024,
+        "DimY": 2024,
+        "Rotation": 0,
+        "FreeRay": 5845
+    },
+    "ImgProc": {
+        "SwBin": 1,
+        "AddSwBin": 0
+    },
+    "Warmup": {
+        "Enable": 1,
+        "Counter": 0,
+        "MaxTimes": 10,
+        "TimeTrigOn": 0,
+        "kV": 195,
+        "Time": 60
+    },
+    "Multiscan": {
+        "Active": 1,
+        "Axis": 1,
+        "NrScans": 3,
+        "ActNrScans": 3,
+        "Dist": 35.23233695,
+        "VoxShiftPerScan": 964,
+        "Direction": 1,
+        "NrScansBefRef": 10
+    },
+    "Helixscan": {
+        "Active": 0
+    },
+    "CalibImages": {
+        "MGainPoints": 3,
+        "Avg": 100,
+        "Skip": 10,
+        "EnableAutoAcq": 1,
+        "MGainVoltage": "220:220:220:",
+        "MGainCurrent": "130:140:150:",
+        "MGainFilter": "__Unknown__:__Unknown__:__Unknown__:",
+        "GainImg": "",
+        "MGainImg": "C:\\Program Files\\phoenix x-ray\\datosx 2 acq\\CalibrationImages\\G_B1_G200_T333_V1.tif",
+        "OffsetImg": "C:\\Program Files\\phoenix x-ray\\datosx 2 acq\\CalibrationImages\\offset_B1x1_G200.0%_T333ms.tif",
+        "DefPixelImg": "C:\\Program Files\\phoenix x-ray\\datosx 2 acq\\CalibrationImages\\pixmask_B1x1_x2024_y2024.tif"
+    },
+    "SectorScan": {
+        "Active": 0
+    },
+    "DetectorShift": {
+        "Enable": 0
+    },
+    "Detector": {
+        "InitTimeOut": 60000,
+        "Name": "DXR-250",
+        "PixelsizeX": 0.2,
+        "PixelsizeY": 0.2,
+        "NrPixelsX": 2024,
+        "NrPixelsY": 2024,
+        "Timing": 3,
+        "TimingVal": 333.096,
+        "Avg": 4,
+        "Skip": 2,
+        "Binning": 0,
+        "BitPP": 16,
+        "CameraGain": 2,
+        "SatValue": 15563,
+        "SatPixNrLimit": 4096
+    },
+    "Xray": {
+        "ComPort": 0,
+        "Name": "xs|240 d",
+        "ID": 2476,
+        "InitTimeout": 20000,
+        "Voltage": 190,
+        "Current": 190,
+        "Mode": 0,
+        "Filter": "0.1Cu",
+        "Target": "Undefined",
+        "FocalSpotSize": 36.1,
+        "Collimation": -1,
+        "WaitTime": 1000,
+        "WaitForStable": 20000,
+        "FocDistX": 0.0,
+        "FocDistY": 0.0,
+        "SpinStepkV": 10,
+        "SpinStepuA": 10,
+        "Macro": 0,
+        "RestrictNumSpots": 0,
+        "PreWarning": 0,
+        "MinGainCurrent": 10
+    },
+    "Cnc": {
+        "InitTimeout": 8000,
+        "JoyDriveDoorOpen": 0,
+        "SecPosSample": 250.0,
+        "MinSampleDetPos": 300.0,
+        "EnableKeyboardJoy": 0,
+        "KeyJoyVelocityFactor": 0.25
+    },
+    "CNC_0": {
+        "DtxName": "XS",
+        "LoadPos": -150.000563,
+        "AcqPos": 0.0
+    },
+    "CNC_1": {
+        "DtxName": "YS",
+        "LoadPos": 395.0005,
+        "AcqPos": 218.023611
+    },
+    "CNC_2": {
+        "DtxName": "ZS",
+        "LoadPos": 267.176625,
+        "AcqPos": 146.699437
+    },
+    "CNC_3": {
+        "DtxName": "RS",
+        "LoadPos": 0.0,
+        "AcqPos": 0.0
+    },
+    "CNC_4": {
+        "DtxName": "XD",
+        "LoadPos": -0.097375,
+        "AcqPos": 0.0
+    },
+    "Axis": {
+        "XSample": 0.0,
+        "YSample": 218.023611,
+        "ZSample": 146.699437,
+        "RSample": 0.0,
+        "XDetector": 0.0
+    },
+    "AcqSrvManager": {
+        "RecvPcIp": "",
+        "ExePath": "c:\\Program Files\\phoenix x-ray\\datosx 2 acq\\srv\\dtxaSrv.exe"
+    },
+    "Net": {
+        "IP": ""
+    }
+}
