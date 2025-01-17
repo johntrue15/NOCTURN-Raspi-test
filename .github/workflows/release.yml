@@ -1,0 +1,77 @@
+name: Create Release
+
+on:
+  push:
+    paths:
+      - 'json/*.json'  # Only trigger on JSON file changes
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    if: |
+      contains(github.event.head_commit.message, 'Auto-commit: Added')
+    steps:
+    - uses: actions/checkout@v2
+    
+    - name: Get JSON filename
+      id: get-filename
+      run: |
+        COMMIT_MSG="${{ github.event.head_commit.message }}"
+        FILENAME=$(echo $COMMIT_MSG | grep -o 'Added.*\.json' | cut -d' ' -f2)
+        echo "filename=$FILENAME" >> $GITHUB_OUTPUT
+        echo "Found JSON file: $FILENAME"
+
+    - name: Extract metadata
+      id: metadata
+      run: |
+        FILENAME="${{ steps.get-filename.outputs.filename }}"
+        JSON_PATH="json/$FILENAME"
+        
+        # Extract key values using jq
+        VOLTAGE=$(jq -r '.Acquisition.Voltage // "N/A"' "$JSON_PATH")
+        CURRENT=$(jq -r '.Acquisition.Current // "N/A"' "$JSON_PATH")
+        FDD=$(jq -r '.Acquisition.FDD // "N/A"' "$JSON_PATH")
+        FOD=$(jq -r '.Acquisition.FOD // "N/A"' "$JSON_PATH")
+        MAG=$(jq -r '.Acquisition.Magnification // "N/A"' "$JSON_PATH")
+        VOXEL_X=$(jq -r '.Acquisition.VoxelSizeX // "N/A"' "$JSON_PATH")
+        VOXEL_Y=$(jq -r '.Acquisition.VoxelSizeY // "N/A"' "$JSON_PATH")
+        
+        # Create release body
+        BODY="## Scan Parameters
+        - Voltage: ${VOLTAGE}kV
+        - Current: ${CURRENT}µA
+        - FDD: ${FDD}mm
+        - FOD: ${FOD}mm
+        - Magnification: ${MAG}x
+        - Voxel Size X: ${VOXEL_X}µm
+        - Voxel Size Y: ${VOXEL_Y}µm"
+        
+        # Escape newlines and quotes for GitHub Actions
+        BODY="${BODY//'%'/'%25'}"
+        BODY="${BODY//$'\n'/'%0A'}"
+        BODY="${BODY//$'\r'/'%0D'}"
+        
+        echo "body=$BODY" >> $GITHUB_OUTPUT
+        echo "version=${FILENAME%.*}" >> $GITHUB_OUTPUT
+
+    - name: Create Release
+      id: create-release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ steps.metadata.outputs.version }}
+        release_name: "Scan ${{ steps.metadata.outputs.version }}"
+        body: ${{ steps.metadata.outputs.body }}
+        draft: false
+        prerelease: false
+
+    - name: Upload JSON Asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create-release.outputs.upload_url }}
+        asset_path: json/${{ steps.get-filename.outputs.filename }}
+        asset_name: ${{ steps.get-filename.outputs.filename }}
+        asset_content_type: application/json 
