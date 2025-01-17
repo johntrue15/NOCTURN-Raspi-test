@@ -32,8 +32,12 @@ jobs:
     - name: Get JSON filename
       id: get-filename
       run: |
-        COMMIT_MSG="${{ github.event.head_commit.message }}"
-        FILENAME=$(echo $COMMIT_MSG | grep -o 'Added.*\.json' | cut -d' ' -f2)
+        if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+          FILENAME="${{ github.event.inputs.filename }}"
+        else
+          COMMIT_MSG="${{ github.event.head_commit.message }}"
+          FILENAME=$(echo $COMMIT_MSG | grep -o 'Added.*\.json' | cut -d' ' -f2)
+        fi
         echo "filename=$FILENAME" >> $GITHUB_OUTPUT
         echo "Found JSON file: $FILENAME"
 
@@ -41,16 +45,26 @@ jobs:
       id: metadata
       run: |
         FILENAME="${{ steps.get-filename.outputs.filename }}"
-        JSON_PATH="json/$FILENAME"
-        
-        # Extract key values using jq
-        VOLTAGE=$(jq -r '.Acquisition.Voltage // "N/A"' "$JSON_PATH")
-        CURRENT=$(jq -r '.Acquisition.Current // "N/A"' "$JSON_PATH")
-        FDD=$(jq -r '.Acquisition.FDD // "N/A"' "$JSON_PATH")
-        FOD=$(jq -r '.Acquisition.FOD // "N/A"' "$JSON_PATH")
-        MAG=$(jq -r '.Acquisition.Magnification // "N/A"' "$JSON_PATH")
-        VOXEL_X=$(jq -r '.Acquisition.VoxelSizeX // "N/A"' "$JSON_PATH")
-        VOXEL_Y=$(jq -r '.Acquisition.VoxelSizeY // "N/A"' "$JSON_PATH")
+        if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+          # For testing, use sample data
+          VOLTAGE="190"
+          CURRENT="130"
+          FDD="802.77534791"
+          FOD="105.8731875"
+          MAG="7.58242353"
+          VOXEL_X="0.02637679"
+          VOXEL_Y="0.02637679"
+        else
+          # Normal processing from JSON file
+          JSON_PATH="json/$FILENAME"
+          VOLTAGE=$(jq -r '.Voltage // "N/A"' "$JSON_PATH")
+          CURRENT=$(jq -r '.Current // "N/A"' "$JSON_PATH")
+          FDD=$(jq -r '.FDD // "N/A"' "$JSON_PATH")
+          FOD=$(jq -r '.FOD // "N/A"' "$JSON_PATH")
+          MAG=$(jq -r '.Magnification // "N/A"' "$JSON_PATH")
+          VOXEL_X=$(jq -r '.VoxelSizeX // "N/A"' "$JSON_PATH")
+          VOXEL_Y=$(jq -r '.VoxelSizeY // "N/A"' "$JSON_PATH")
+        fi
         
         # Create release body
         BODY="## Scan Parameters
