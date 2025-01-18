@@ -16,21 +16,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
-      - name: Prepare Wiki Repository
-        run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git clone "https://${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.wiki.git" wiki
-          
-      - name: Sync Documentation
-        run: |
-          cp -r docs/* wiki/
-          cd wiki
-          git add .
-          if git diff --staged --quiet; then
-            echo "No changes to commit"
-            exit 0
-          fi
-          git commit -m "docs: sync wiki from docs directory"
-          git push 
+
+      - name: Push Wiki Changes
+        uses: Andrew-Chen-Wang/github-wiki-action@v4
+        with:
+          path: docs
+          commit-message: "docs: sync wiki pages"
+          token: ${{ secrets.GITHUB_TOKEN }} 
