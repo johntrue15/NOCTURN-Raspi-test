@@ -29,21 +29,14 @@ jobs:
       with:
         python-version: '3.9'
         
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-        
     - name: Process File
       id: process
       run: |
-        mkdir -p logs
-        export PCA_PARSER_LOG="logs/pca_parser.log"
-        export PYTHONPATH="${PYTHONPATH}:${GITHUB_WORKSPACE}"
+        mkdir -p data/output
         
         if [[ "${{ github.event.inputs.filename }}" == *.pca ]]; then
-          python3 .github/scripts/process_pca.py "${{ github.event.inputs.filename }}"
-          echo "filename=${github.event.inputs.filename%.pca}.json" >> $GITHUB_OUTPUT
+          python3 .github/scripts/pca_to_json.py "${{ github.event.inputs.filename }}"
+          echo "filename=data/output/${github.event.inputs.filename%.pca}.pca.json" >> $GITHUB_OUTPUT
         else
           echo "filename=${{ github.event.inputs.filename }}" >> $GITHUB_OUTPUT
         fi
