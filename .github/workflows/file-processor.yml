@@ -35,7 +35,8 @@ jobs:
         mkdir -p data/output
         
         if [[ "${{ github.event.inputs.filename }}" == *.pca ]]; then
-          python3 .github/scripts/pca_to_json.py "${{ github.event.inputs.filename }}"
+          INPUT_FILE="data/input/${{ github.event.inputs.filename }}"
+          python3 .github/scripts/pca_to_json.py "$INPUT_FILE"
           echo "filename=data/output/${github.event.inputs.filename%.pca}.pca.json" >> $GITHUB_OUTPUT
         else
           echo "filename=${{ github.event.inputs.filename }}" >> $GITHUB_OUTPUT
