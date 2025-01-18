@@ -39,6 +39,7 @@ jobs:
       run: |
         mkdir -p logs
         export PCA_PARSER_LOG="logs/pca_parser.log"
+        export PYTHONPATH="${PYTHONPATH}:${GITHUB_WORKSPACE}"
         
         if [[ "${{ github.event.inputs.filename }}" == *.pca ]]; then
           python3 .github/scripts/process_pca.py "${{ github.event.inputs.filename }}"
@@ -48,6 +49,7 @@ jobs:
         fi
 
     - name: Generate Attestation
+      id: attest
       uses: actions/attest@v2.1.0
       with:
         subject-path: ${{ steps.process.outputs.filename }}
