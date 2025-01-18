@@ -66,8 +66,11 @@ jobs:
     - name: Create Release
       uses: softprops/action-gh-release@v1
       with:
-        tag_name: ${{ steps.process.outputs.filename }}
-        name: "Scan ${{ steps.process.outputs.filename }}"
+        tag_name: scan-${{ github.run_number }}
+        name: "Scan: ${{ steps.process.outputs.filename }}"
+        body: |
+          Processed file: ${{ steps.process.outputs.filename }}
+          Attestation: ${{ steps.attest.outputs.attestation-url }}
         files: |
           ${{ steps.process.outputs.filename }}
           ${{ steps.attest.outputs.bundle-path }}
