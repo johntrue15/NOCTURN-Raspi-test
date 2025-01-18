@@ -48,29 +48,17 @@ jobs:
       uses: actions/attest@v2.1.0
       with:
         subject-path: ${{ steps.process.outputs.filename }}
-        predicate-type: 'https://slsa.dev/provenance/v1'
+        predicate-type: 'https://in-toto.io/attestation/release/v0.1'
         predicate: |
           {
-            "buildDefinition": {
-              "buildType": "https://github.com/Attestations/GitHubHostedActions@v1",
-              "externalParameters": {
-                "workflow": {
-                  "ref": "${{ github.ref }}",
-                  "repository": "${{ github.repository }}"
-                }
-              },
-              "resolvedDependencies": [
-                {
-                  "uri": "git+https://github.com/${{ github.repository }}@${{ github.sha }}"
-                }
-              ]
-            },
-            "runDetails": {
-              "builder": {
-                "id": "https://github.com/actions/runner"
-              },
-              "metadata": {
-                "invocationId": "${{ github.run_id }}"
+            "purl": "pkg:github/${{ github.repository }}",
+            "version": "${{ github.sha }}",
+            "metadata": {
+              "buildInvocationId": "${{ github.run_id }}",
+              "completeness": {
+                "parameters": true,
+                "environment": true,
+                "materials": true
               }
             }
           }
