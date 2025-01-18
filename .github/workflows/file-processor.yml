@@ -36,8 +36,9 @@ jobs:
         fi
 
     - name: Generate SLSA Provenance
-      uses: slsa-framework/generic-generator@v1.3
+      uses: slsa-framework/slsa-github-generator@v1.9.0
       with:
+        attestation-name: "scan-data"
         base64-subjects: "${{ hashFiles(steps.process.outputs.filename) }}"
         provenance-name: "provenance.att"
 
