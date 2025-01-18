@@ -37,8 +37,11 @@ jobs:
     - name: Process File
       id: process
       run: |
+        mkdir -p logs
+        export PCA_PARSER_LOG="logs/pca_parser.log"
+        
         if [[ "${{ github.event.inputs.filename }}" == *.pca ]]; then
-          python3 pca_parser.py "${{ github.event.inputs.filename }}"
+          python3 .github/scripts/process_pca.py "${{ github.event.inputs.filename }}"
           echo "filename=${github.event.inputs.filename%.pca}.json" >> $GITHUB_OUTPUT
         else
           echo "filename=${{ github.event.inputs.filename }}" >> $GITHUB_OUTPUT
