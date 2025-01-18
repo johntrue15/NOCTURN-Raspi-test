@@ -36,8 +36,9 @@ jobs:
         
         if [[ "${{ github.event.inputs.filename }}" == *.pca ]]; then
           INPUT_FILE="data/input/${{ github.event.inputs.filename }}"
+          OUTPUT_NAME=$(basename "${{ github.event.inputs.filename }}" .pca).pca.json
           python3 .github/scripts/pca_to_json.py "$INPUT_FILE"
-          echo "filename=data/output/${github.event.inputs.filename%.pca}.pca.json" >> $GITHUB_OUTPUT
+          echo "filename=data/output/$OUTPUT_NAME" >> $GITHUB_OUTPUT
         else
           echo "filename=${{ github.event.inputs.filename }}" >> $GITHUB_OUTPUT
         fi
