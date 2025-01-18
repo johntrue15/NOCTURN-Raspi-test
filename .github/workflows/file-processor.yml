@@ -16,8 +16,7 @@ permissions:
   contents: write
   id-token: write
   actions: read
-  security-events: write
-  packages: write
+  attestations: write
 
 jobs:
   process-and-release:
@@ -34,8 +33,7 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
-        pip install -r requirements-dev.txt
-    
+        
     - name: Process File
       id: process
       run: |
@@ -49,15 +47,18 @@ jobs:
     - name: Generate Attestation
       uses: actions/attest@v2.1.0
       with:
+        subject-path: ${{ steps.process.outputs.filename }}
         predicate-type: 'https://slsa.dev/provenance/v1'
         predicate: |
           {
             "buildType": "https://github.com/actions/runner",
             "builder": {
               "id": "${{ github.repository }}/.github/workflows/file-processor.yml@${{ github.ref }}"
+            },
+            "metadata": {
+              "buildInvocationID": "${{ github.run_id }}"
             }
           }
-        subject-path: ${{ steps.process.outputs.filename }}
 
     - name: Create Release
       uses: softprops/action-gh-release@v1
@@ -66,4 +67,4 @@ jobs:
         name: "Scan ${{ steps.process.outputs.filename }}"
         files: |
           ${{ steps.process.outputs.filename }}
-          provenance.att
+          ${{ steps.attest.outputs.bundle-path }}
