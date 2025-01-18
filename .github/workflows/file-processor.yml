@@ -52,7 +52,7 @@ jobs:
         predicate: |
           {
             "buildDefinition": {
-              "buildType": "https://github.com/actions/runner/github-workflow",
+              "buildType": "https://github.com/Attestations/GitHubHostedActions@v1",
               "externalParameters": {
                 "workflow": {
                   "ref": "${{ github.ref }}",
