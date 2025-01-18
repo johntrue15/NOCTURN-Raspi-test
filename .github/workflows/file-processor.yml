@@ -1,94 +1,51 @@
 name: File Processor
+
 on:
   push:
     paths:
-      - 'data/input/**'
+      - 'data/input/*.pca'
+      - 'json/*.json'
+  workflow_dispatch:
+    inputs:
+      filename:
+        description: 'File to process'
+        required: true
+        default: 'Nano Di Side.pca'
+
+permissions:
+  contents: write
+  id-token: write
+  actions: read
+  security-events: write
+  packages: write
+
 jobs:
-  process-files:
+  process-and-release:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.10'
-    
-    - name: Install dependencies
+    - name: Process File
+      id: process
       run: |
-        python -m pip install --upgrade pip
-        pip install numpy pandas striprtf
-    
-    - name: Detect and process files
-      id: file-detection
-      run: |
-        # Get list of new files in data/input
-        for file in data/input/*; do
-          if [[ -f "$file" ]]; then
-            ext="${file##*.}"
-            case "$ext" in
-              "rtf")
-                echo "Processing RTF file: $file"
-                python .github/scripts/rtf_to_json.py "$file"
-                ;;
-              "pca")
-                echo "Processing PCA file: $file"
-                python .github/scripts/pca_to_json.py "$file"
-                ;;
-              "pcj")
-                echo "Processing PCJ file: $file"
-                python .github/scripts/pcj_to_json.py "$file"
-                ;;
-              "pcp")
-                echo "Processing PCP file: $file"
-                python .github/scripts/pcp_to_json.py "$file"
-                ;;
-              "pcr")
-                echo "Processing PCR file: $file"
-                python .github/scripts/pcr_to_json.py "$file"
-                ;;
-              "vgl")
-                echo "Processing VGL file: $file"
-                python .github/scripts/vgl_to_json.py "$file"
-                ;;
-              *)
-                echo "Unknown file type: $file"
-                ;;
-            esac
-          fi
-        done
-    
-    - name: Move processed files to archive
-      run: |
-        mkdir -p data/archive
-        for file in data/input/*; do
-          if [[ -f "$file" ]]; then
-            mv "$file" data/archive/
-          fi
-        done
-    
-    - name: Commit JSON outputs
-      run: |
-        git config --local user.email "github-actions[bot]@users.noreply.github.com"
-        git config --local user.name "github-actions[bot]"
-        
-        # Add any new JSON files in data/output
-        git add data/output/*.json
-        
-        # Commit if there are changes
-        if git diff --staged --quiet; then
-          echo "No changes to commit"
+        if [[ "${{ github.event.inputs.filename }}" == *.pca ]]; then
+          python3 pca_parser.py "${{ github.event.inputs.filename }}"
+          echo "filename=${github.event.inputs.filename%.pca}.json" >> $GITHUB_OUTPUT
         else
-          git commit -m "Update JSON outputs [skip ci]"
-          git push
+          echo "filename=${{ github.event.inputs.filename }}" >> $GITHUB_OUTPUT
         fi
-    
-    - name: Upload archived files
-      uses: actions/upload-artifact@v3
+
+    - name: Generate SLSA Provenance
+      uses: slsa-framework/slsa-github-generator/actions/generator@v1.9.0
       with:
-        name: archived-files
-        path: ${{ github.event.inputs.archive_dir || 'data/archive' }}/*.*
-        retention-days: 90
+        base64-subjects: "${{ hashFiles(steps.process.outputs.filename) }}"
+        provenance-name: "provenance.att"
+
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ steps.process.outputs.filename }}
+        name: "Scan ${{ steps.process.outputs.filename }}"
+        files: |
+          ${{ steps.process.outputs.filename }}
+          provenance.att
