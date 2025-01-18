@@ -1,61 +1,50 @@
-name: PCA File Processor
+name: PCA Converter and Release
 
 on:
- # push:
-  #  paths:
-  #    - '**.pca'
+  push:
+    paths:
+      - 'data/input/*.pca'
   workflow_dispatch:
     inputs:
-      input_dir:
-        description: 'Directory containing PCA files'
-        required: false
-        default: 'data/input'
-      output_dir:
-        description: 'Directory for JSON output'
-        required: false
-        default: 'data/output'
-      archive_dir:
-        description: 'Directory for processed PCA files'
-        required: false
-        default: 'data/archive'
+      pca_file:
+        description: 'PCA file to convert'
+        required: true
+        default: 'Nano Di Side.pca'
+
+permissions:
+  contents: write
+  id-token: write
+  actions: read
+  security-events: write
+  packages: write
 
 jobs:
-  process-pca:
+  convert-and-release:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.10'
-    
-    - name: Create directories
+    - name: Convert PCA to JSON
       run: |
-        mkdir -p ${{ github.event.inputs.input_dir || 'data/input' }}
-        mkdir -p ${{ github.event.inputs.output_dir || 'data/output' }}
-        mkdir -p ${{ github.event.inputs.archive_dir || 'data/archive' }}
-    
-    - name: Run PCA processor
+        python3 pca_parser.py "${{ github.event.inputs.pca_file || github.event.path }}"
+        echo "json_file=${pca_file%.pca}.json" >> $GITHUB_ENV
+
+    - name: Generate SLSA Provenance
+      uses: slsa-framework/slsa-github-generator/actions/generator@v1.9.0
+      with:
+        base64-subjects: "${{ hashFiles(env.json_file) }}"
+        provenance-name: "provenance.att"
+        upload-assets: true
+
+    - name: Create Release
+      uses: actions/create-release@v1
       env:
-        INPUT_DIR: ${{ github.event.inputs.input_dir || 'data/input' }}
-        OUTPUT_DIR: ${{ github.event.inputs.output_dir || 'data/output' }}
-        ARCHIVE_DIR: ${{ github.event.inputs.archive_dir || 'data/archive' }}
-      run: python .github/scripts/pca_to_json.py
-    
-    - name: Commit JSON files
-      run: |
-        git config --local user.email "github-actions[bot]@users.noreply.github.com"
-        git config --local user.name "github-actions[bot]"
-        git add ${{ github.event.inputs.output_dir || 'data/output' }}/*.json
-        git diff --quiet && git diff --staged --quiet || (git commit -m "Update JSON outputs from PCA processing [skip ci]" && git push)
-    
-    - name: Upload archived PCA files
-      uses: actions/upload-artifact@v3
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        name: archived-pca-files
-        path: ${{ github.event.inputs.archive_dir || 'data/archive' }}/*.pca
-        retention-days: 90
+        tag_name: ${{ env.json_file }}
+        release_name: "Scan ${{ env.json_file }}"
+        body: |
+          Converted from PCA file: ${{ github.event.inputs.pca_file || github.event.path }}
+          See attached provenance for build verification.
+        draft: false
+        prerelease: false
