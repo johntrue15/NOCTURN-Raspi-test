@@ -51,12 +51,27 @@ jobs:
         predicate-type: 'https://slsa.dev/provenance/v1'
         predicate: |
           {
-            "buildType": "https://github.com/actions/runner",
-            "builder": {
-              "id": "${{ github.repository }}/.github/workflows/file-processor.yml@${{ github.ref }}"
+            "buildDefinition": {
+              "buildType": "https://github.com/actions/runner/github-workflow",
+              "externalParameters": {
+                "workflow": {
+                  "ref": "${{ github.ref }}",
+                  "repository": "${{ github.repository }}"
+                }
+              },
+              "resolvedDependencies": [
+                {
+                  "uri": "git+https://github.com/${{ github.repository }}@${{ github.sha }}"
+                }
+              ]
             },
-            "metadata": {
-              "buildInvocationID": "${{ github.run_id }}"
+            "runDetails": {
+              "builder": {
+                "id": "https://github.com/actions/runner"
+              },
+              "metadata": {
+                "invocationId": "${{ github.run_id }}"
+              }
             }
           }
 
