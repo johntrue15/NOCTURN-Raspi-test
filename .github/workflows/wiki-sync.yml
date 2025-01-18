@@ -1,0 +1,25 @@
+name: Wiki Sync
+
+on:
+  push:
+    paths:
+      - 'docs/*.md'
+      - '.github/workflows/wiki-sync.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+
+jobs:
+  sync-wiki:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Push Wiki Changes
+        uses: Andrew-Chen-Wang/github-wiki-action@v4
+        with:
+          path: docs
+          commit-message: "docs: sync wiki pages"
+          token: ${{ secrets.GITHUB_TOKEN }} 
