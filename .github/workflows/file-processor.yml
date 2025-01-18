@@ -35,12 +35,18 @@ jobs:
           echo "filename=${{ github.event.inputs.filename }}" >> $GITHUB_OUTPUT
         fi
 
-    - name: Generate SLSA Provenance
-      uses: slsa-framework/slsa-github-generator@v1.9.0
+    - name: Generate Attestation
+      uses: actions/attest@v2.1.0
       with:
-        attestation-name: "scan-data"
-        base64-subjects: "${{ hashFiles(steps.process.outputs.filename) }}"
-        provenance-name: "provenance.att"
+        predicate-type: 'https://slsa.dev/provenance/v1'
+        predicate: |
+          {
+            "buildType": "https://github.com/actions/runner",
+            "builder": {
+              "id": "${{ github.repository }}/.github/workflows/file-processor.yml@${{ github.ref }}"
+            }
+          }
+        subject-path: ${{ steps.process.outputs.filename }}
 
     - name: Create Release
       uses: softprops/action-gh-release@v1
