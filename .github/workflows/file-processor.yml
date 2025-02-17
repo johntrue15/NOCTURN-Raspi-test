@@ -39,15 +39,22 @@ jobs:
           OUTPUT_NAME=$(basename "${{ github.event.inputs.filename }}" .pca).pca.json
           python3 .github/scripts/pca_to_json.py "$INPUT_FILE"
           echo "filename=data/output/$OUTPUT_NAME" >> $GITHUB_OUTPUT
+          echo "filepath=$(realpath data/output/$OUTPUT_NAME)" >> $GITHUB_OUTPUT
         else
           echo "filename=${{ github.event.inputs.filename }}" >> $GITHUB_OUTPUT
+          echo "filepath=$(realpath ${{ github.event.inputs.filename }})" >> $GITHUB_OUTPUT
         fi
+
+    - name: Verify File Exists
+      run: |
+        ls -l ${{ steps.process.outputs.filepath }}
+        echo "File to attest: ${{ steps.process.outputs.filepath }}"
 
     - name: Generate Attestation
       id: attest
       uses: actions/attest@v2.1.0
       with:
-        subject-path: ${{ steps.process.outputs.filename }}
+        subject-path: ${{ steps.process.outputs.filepath }}
         predicate-type: 'https://in-toto.io/attestation/release/v0.1'
         predicate: |
           {
@@ -72,5 +79,5 @@ jobs:
           Processed file: ${{ steps.process.outputs.filename }}
           Attestation: ${{ steps.attest.outputs.attestation-url }}
         files: |
-          ${{ steps.process.outputs.filename }}
+          ${{ steps.process.outputs.filepath }}
           ${{ steps.attest.outputs.bundle-path }}

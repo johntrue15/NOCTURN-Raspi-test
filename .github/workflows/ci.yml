@@ -50,6 +50,14 @@ jobs:
         # Test provenance generation
         gh workflow run release.yml 
 
+    - name: Install SLSA verifier
+      if: github.event_name == 'pull_request'
+      run: |
+        mkdir -p $HOME/.local/bin
+        wget -O $HOME/.local/bin/slsa-verifier https://github.com/slsa-framework/slsa-verifier/releases/download/v2.0.0/slsa-verifier-linux-amd64
+        chmod +x $HOME/.local/bin/slsa-verifier
+        echo "$HOME/.local/bin" >> $GITHUB_PATH
+
     - name: Verify SLSA Provenance
       if: github.event_name == 'pull_request'
       run: |
