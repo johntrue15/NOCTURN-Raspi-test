@@ -1,0 +1,8 @@
+<?xml version="1.0"?>
+<project>
+	<additional_project_info>
+		<property name="Operator" description="Current operator name." type="5" value="" visible="1" />
+		<property name="Component Name" description="Name of the item to be tested." type="5" value="" visible="1" />
+		<property name="Component ID" description="ID of the item to be tested." type="1" value="0" visible="1" />
+	</additional_project_info>
+</project>

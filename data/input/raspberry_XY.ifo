@@ -1,0 +1,12 @@
+[FileDataDimensions]
+Dim0=1106
+Dim1=1052
+Dim2=1
+[Elements]
+ElementType=unsigned short
+ElementBitDepth=16
+[Files]
+NumberFiles=2023
+FirstFile=S:\CT_DATA\FICS\raspberry_XY0000.tif
+LastFile=S:\CT_DATA\FICS\raspberry_XY2022.tif
+Container=TIFF
