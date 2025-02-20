@@ -275,6 +275,35 @@ jobs:
         echo "Software version: $SOFTWARE_VERSION"
         echo "Number of images: $NUM_IMAGES"
         
+        # Debug PCA file path and existence
+        echo "PCA file path: $PCA_FILE"
+        if [[ -f "$PCA_FILE" ]]; then
+          echo "PCA file exists"
+          echo "PCA file contents:"
+          cat "$PCA_FILE"
+        else
+          echo "PCA file does not exist!"
+        fi
+        
+        # Try multiple methods to extract NumberImages
+        echo "Attempting to extract NumberImages using different methods:"
+        
+        # Method 1: Direct grep
+        echo "Method 1 (direct grep):"
+        grep "NumberImages" "$PCA_FILE" || echo "Not found with direct grep"
+        
+        # Method 2: Line containing NumberImages
+        echo "Method 2 (full line):"
+        grep -A 1 -B 1 "NumberImages" "$PCA_FILE" || echo "No context found"
+        
+        # Method 3: Raw pattern match
+        echo "Method 3 (raw pattern):"
+        grep -o "NumberImages=[0-9]*" "$PCA_FILE" || echo "No pattern match"
+        
+        # Extract NumberImages with more flexible pattern
+        NUM_IMAGES=$(grep -o "NumberImages[[:space:]]*=[[:space:]]*[0-9]*" "$PCA_FILE" | grep -o "[0-9]*$" || echo "N/A")
+        echo "Final extracted NumberImages: $NUM_IMAGES"
+        
         # Extract JSON values with error checking
         function get_json_value() {
           local key="$1"
@@ -362,7 +391,7 @@ jobs:
         | Z pixel spacing | ${PIXEL_X} |
         | Pixel spacing units | Mm |
         | Slice thickness | ${VOXEL_X} |
-        | Number of images in set | ${NUM_IMAGES} |
+        | Number of images in set | ${NUM_IMAGES:-N/A} |
         
         # Image Acquisition Details
         
@@ -379,7 +408,7 @@ jobs:
         | Flux normalization | Yes |
         | Shading correction | Yes |
         | Frame averaging | ${FRAME_AVG} |
-        | Projections | ${NUM_IMAGES} |
+        | Projections | ${NUM_IMAGES:-N/A} |
         | Voltage | ${VOLTAGE} |
         | Power | ${POWER} W |
         | Amperage | ${CURRENT} |
