@@ -243,28 +243,41 @@ jobs:
         # Create a temporary file for the release notes
         NOTES=$(mktemp)
         
-        # Get file info
-        FILE_SIZE=$(stat -f%s "${{ steps.process.outputs.filepath }}")
+        # Get file info - using Linux stat format
+        FILE_SIZE=$(stat -c%s "${{ steps.process.outputs.filepath }}" || echo "N/A")
         
-        # Extract JSON values
-        DIM_X=$(jq -r '.DimX // "N/A"' "${{ steps.process.outputs.filepath }}")
-        DIM_Y=$(jq -r '.DimY // "N/A"' "${{ steps.process.outputs.filepath }}")
-        BIT_PP=$(jq -r '.BitPP // "N/A"' "${{ steps.process.outputs.filepath }}")
-        PIXEL_X=$(jq -r '.PixelsizeX // "N/A"' "${{ steps.process.outputs.filepath }}")
-        PIXEL_Y=$(jq -r '.PixelsizeY // "N/A"' "${{ steps.process.outputs.filepath }}")
-        VOXEL_X=$(jq -r '.VoxelSizeX // "N/A"' "${{ steps.process.outputs.filepath }}")
-        NUM_IMAGES=$(jq -r '.NumberImages // "N/A"' "${{ steps.process.outputs.filepath }}")
-        EVENT_DATE=$(jq -r '.Date // "N/A"' "${{ steps.process.outputs.filepath }}")
-        FILTER=$(jq -r '.Filter // "N/A"' "${{ steps.process.outputs.filepath }}")
-        EXPOSURE=$(jq -r '.ExposureTime // "N/A"' "${{ steps.process.outputs.filepath }}")
-        FRAME_AVG=$(jq -r '.FrameAveraging // "N/A"' "${{ steps.process.outputs.filepath }}")
-        PROJECTIONS=$(jq -r '.Projections // "N/A"' "${{ steps.process.outputs.filepath }}")
-        VOLTAGE=$(jq -r '.Voltage // "N/A"' "${{ steps.process.outputs.filepath }}")
-        POWER=$(jq -r '.Power // "N/A"' "${{ steps.process.outputs.filepath }}")
-        CURRENT=$(jq -r '.Current // "N/A"' "${{ steps.process.outputs.filepath }}")
-        SOD=$(jq -r '.SourceObjectDistance // "N/A"' "${{ steps.process.outputs.filepath }}")
-        SDD=$(jq -r '.SourceDetectorDistance // "N/A"' "${{ steps.process.outputs.filepath }}")
-        MAG=$(jq -r '.OpticalMagnification // "N/A"' "${{ steps.process.outputs.filepath }}")
+        # Extract JSON values with error checking
+        function get_json_value() {
+          local value
+          value=$(jq -r ".$1 // \"N/A\"" "${{ steps.process.outputs.filepath }}" 2>/dev/null || echo "N/A")
+          echo "$value"
+        }
+        
+        # Get all values with error handling
+        DIM_X=$(get_json_value "DimX")
+        DIM_Y=$(get_json_value "DimY")
+        BIT_PP=$(get_json_value "BitPP")
+        PIXEL_X=$(get_json_value "PixelsizeX")
+        PIXEL_Y=$(get_json_value "PixelsizeY")
+        VOXEL_X=$(get_json_value "VoxelSizeX")
+        NUM_IMAGES=$(get_json_value "NumberImages")
+        EVENT_DATE=$(get_json_value "Date")
+        FILTER=$(get_json_value "Filter")
+        EXPOSURE=$(get_json_value "ExposureTime")
+        FRAME_AVG=$(get_json_value "FrameAveraging")
+        PROJECTIONS=$(get_json_value "Projections")
+        VOLTAGE=$(get_json_value "Voltage")
+        POWER=$(get_json_value "Power")
+        CURRENT=$(get_json_value "Current")
+        SOD=$(get_json_value "SourceObjectDistance")
+        SDD=$(get_json_value "SourceDetectorDistance")
+        MAG=$(get_json_value "OpticalMagnification")
+        
+        # Debug output
+        echo "Extracted values:"
+        echo "File size: $FILE_SIZE"
+        echo "DimX: $DIM_X"
+        echo "DimY: $DIM_Y"
         
         # Generate the release notes
         cat > "$NOTES" << EOF
@@ -294,7 +307,7 @@ jobs:
         | Modality | X-Ray Computed Tomography (CT/microCT) |
         | Device | NOCTURN Raspberry Pi Scanner |
         | Device facility | Custom Build |
-        | Creator | $(git config user.name) |
+        | Creator | $(git config user.name || echo "github-actions[bot]") |
         | Event date | ${EVENT_DATE} |
         | Software | NOCTURN PCA Parser |
         | Filter | ${FILTER} |
@@ -318,6 +331,10 @@ jobs:
         2. Processed JSON file
         3. Attestation bundle
         EOF
+        
+        # Debug the generated notes
+        echo "Generated release notes:"
+        cat "$NOTES"
         
         # Save the release notes to the output
         echo "notes<<EOF" >> $GITHUB_OUTPUT
