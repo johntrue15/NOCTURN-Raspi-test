@@ -254,41 +254,52 @@ jobs:
           echo "$1" | tr -d '\n' | tr -s ' ' | sed 's/^ *//;s/ *$//'
         }
         
-        # Extract system name and version from PCA file
-        echo "Looking for system info in: $PCA_FILE"
-        SYSTEM_NAME=$(grep -o 'SystemName=.*' "$PCA_FILE" | cut -d'=' -f2 | clean_value || echo "v|tome|x m")
-        SOFTWARE_VERSION=$(grep -o 'Version=[0-9.]*' "$PCA_FILE" | cut -d'=' -f2 | clean_value || echo "2.8.2.20099")
-        echo "Extracted system name: $SYSTEM_NAME"
-        echo "Extracted software version: $SOFTWARE_VERSION"
+        # Function to extract value after equals sign
+        function get_pca_value() {
+          local pattern="$1"
+          local default="$2"
+          grep -o "$pattern=[^ ]*" "$PCA_FILE" | cut -d'=' -f2 | clean_value || echo "$default"
+        }
         
-        # Extract NumberImages from PCA file
-        echo "Looking for NumberImages in: $PCA_FILE"
-        NUM_IMAGES=$(grep -o 'NumberImages=[0-9]*' "$PCA_FILE" | cut -d'=' -f2 | clean_value || echo "N/A")
-        echo "Extracted NumberImages from PCA: $NUM_IMAGES"
+        # Extract values from PCA file
+        echo "Looking for values in: $PCA_FILE"
+        SYSTEM_NAME=$(get_pca_value "SystemName" "v|tome|x m")
+        SOFTWARE_VERSION=$(get_pca_value "Version" "2.8.2.20099")
+        NUM_IMAGES=$(get_pca_value "NumberImages" "N/A")
+        
+        # Debug PCA extraction
+        echo "Raw PCA file content:"
+        cat "$PCA_FILE"
+        echo "---"
+        echo "System name: $SYSTEM_NAME"
+        echo "Software version: $SOFTWARE_VERSION"
+        echo "Number of images: $NUM_IMAGES"
         
         # Extract JSON values with error checking
         function get_json_value() {
+          local key="$1"
+          local default="$2"
           local value
-          value=$(jq -r ".$1 // \"N/A\"" "${{ steps.process.outputs.filepath }}" 2>/dev/null || echo "N/A")
+          value=$(jq -r ".$key // \"$default\"" "${{ steps.process.outputs.filepath }}" 2>/dev/null || echo "$default")
           clean_value "$value"
         }
         
-        # Get all values with error handling
-        DIM_X=$(get_json_value "DimX")
-        DIM_Y=$(get_json_value "DimY")
-        BIT_PP=$(get_json_value "BitPP")
-        PIXEL_X=$(get_json_value "PixelsizeX")
-        PIXEL_Y=$(get_json_value "PixelsizeY")
-        VOXEL_X=$(get_json_value "VoxelSizeX")
-        EVENT_DATE=$(get_json_value "Date")
-        FILTER=$(get_json_value "Filter")
-        EXPOSURE=$(get_json_value "TimingVal")
-        FRAME_AVG=$(get_json_value "Avg")
-        VOLTAGE=$(get_json_value "Voltage")
-        CURRENT=$(get_json_value "Current")
-        FDD=$(get_json_value "FDD")
-        FOD=$(get_json_value "FOD")
-        MAG=$(get_json_value "Magnification")
+        # Get all values with error handling and defaults
+        DIM_X=$(get_json_value "DimX" "N/A")
+        DIM_Y=$(get_json_value "DimY" "N/A")
+        BIT_PP=$(get_json_value "BitPP" "16")
+        PIXEL_X=$(get_json_value "PixelsizeX" "N/A")
+        PIXEL_Y=$(get_json_value "PixelsizeY" "N/A")
+        VOXEL_X=$(get_json_value "VoxelSizeX" "N/A")
+        EVENT_DATE=$(get_json_value "Date" "N/A")
+        FILTER=$(get_json_value "Filter" "N/A")
+        EXPOSURE=$(get_json_value "TimingVal" "N/A")
+        FRAME_AVG=$(get_json_value "Avg" "N/A")
+        VOLTAGE=$(get_json_value "Voltage" "N/A")
+        CURRENT=$(get_json_value "Current" "N/A")
+        FDD=$(get_json_value "FDD" "N/A")
+        FOD=$(get_json_value "FOD" "N/A")
+        MAG=$(get_json_value "Magnification" "N/A")
         
         # Debug output
         echo "PCA file contents:"
