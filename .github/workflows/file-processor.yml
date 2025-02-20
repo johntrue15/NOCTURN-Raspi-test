@@ -61,10 +61,33 @@ jobs:
             echo "Detected file deletion event - skipping processing"
             exit 0
           fi
-        fi
-        
-        # For workflow_dispatch, check if filename is provided
-        if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+          
+          # Get the list of added/modified files
+          CHANGED_FILES=$(git diff --name-only --diff-filter=AM ${{ github.event.before }} ${{ github.event.after }} || echo "")
+          echo "Changed files: $CHANGED_FILES"
+          
+          # Process only PCA or JSON files
+          while IFS= read -r file; do
+            if [[ "$file" =~ ^data/input/.*\.pca$ || "$file" =~ ^json/.*\.json$ ]]; then
+              echo "Processing changed file: $file"
+              
+              if [[ "$file" == *.pca ]]; then
+                OUTPUT_NAME=$(basename "$file" .pca).pca.json
+                python3 .github/scripts/pca_to_json.py "$file"
+                OUTPUT_PATH="data/output/$OUTPUT_NAME"
+                echo "filename=$OUTPUT_NAME" >> $GITHUB_OUTPUT
+                echo "filepath=$OUTPUT_PATH" >> $GITHUB_OUTPUT
+              else
+                echo "filename=$file" >> $GITHUB_OUTPUT
+                echo "filepath=$file" >> $GITHUB_OUTPUT
+              fi
+              
+              # We'll process only the first matching file
+              break
+            fi
+          done <<< "$CHANGED_FILES"
+          
+        elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
           if [[ -z "${{ github.event.inputs.filename }}" ]]; then
             echo "Error: No filename provided"
             exit 1
@@ -105,6 +128,14 @@ jobs:
             fi
           fi
         fi
+        
+        # Verify we have set the outputs
+        if [[ -z "${{ steps.process.outputs.filepath }}" ]]; then
+          echo "No valid files to process"
+          echo "deleted=true" >> $GITHUB_OUTPUT
+          exit 0
+        fi
+        
         echo "deleted=false" >> $GITHUB_OUTPUT
         
         # Debug outputs
