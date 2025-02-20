@@ -5,9 +5,8 @@ on:
     paths:
       - 'data/input/*.pca'
       - 'json/*.json'
-    paths-ignore:
-      - '**/*.md'
-      - '.gitignore'
+      - '!**/*.md'
+      - '!.gitignore'
   workflow_dispatch:
     inputs:
       filename:
