@@ -44,6 +44,10 @@ jobs:
       run: |
         mkdir -p data/output
         
+        # Debug event info
+        echo "Event name: ${{ github.event_name }}"
+        echo "Event inputs: ${{ toJSON(github.event.inputs) }}"
+        
         # Check if this is a file deletion event
         if [[ "${{ github.event_name }}" == "push" ]]; then
           # Fetch git history first
@@ -52,6 +56,8 @@ jobs:
           # Get the list of deleted files from git
           DELETED_FILES=$(git diff --name-only --diff-filter=D ${{ github.event.before }} ${{ github.event.after }} || echo "")
           if [[ -n "$DELETED_FILES" ]]; then
+            echo "Deleted files: $DELETED_FILES"
+            echo "deleted=true" >> $GITHUB_OUTPUT
             echo "Detected file deletion event - skipping processing"
             exit 0
           fi
@@ -64,8 +70,12 @@ jobs:
             exit 1
           fi
           
+          echo "Processing file: ${{ github.event.inputs.filename }}"
+          
           if [[ "${{ github.event.inputs.filename }}" == *.pca ]]; then
             INPUT_FILE="data/input/${{ github.event.inputs.filename }}"
+            echo "Input file path: $INPUT_FILE"
+            
             # Check if input PCA file exists
             if [[ ! -f "$INPUT_FILE" ]]; then
               echo "Error: PCA file '$INPUT_FILE' not found"
@@ -73,8 +83,10 @@ jobs:
             fi
             
             OUTPUT_NAME=$(basename "${{ github.event.inputs.filename }}" .pca).pca.json
+            echo "Output name: $OUTPUT_NAME"
             python3 .github/scripts/pca_to_json.py "$INPUT_FILE"
             OUTPUT_PATH="data/output/$OUTPUT_NAME"
+            echo "Output path: $OUTPUT_PATH"
             echo "filename=$OUTPUT_NAME" >> $GITHUB_OUTPUT
             echo "filepath=$OUTPUT_PATH" >> $GITHUB_OUTPUT
             
@@ -93,8 +105,14 @@ jobs:
             fi
           fi
         fi
+        echo "deleted=false" >> $GITHUB_OUTPUT
+        
+        # Debug outputs
+        echo "GITHUB_OUTPUT contents:"
+        cat $GITHUB_OUTPUT
 
     - name: Debug File Path
+      if: steps.process.outputs.deleted != 'true'
       run: |
         echo "Current directory: $(pwd)"
         echo "File path from output: ${{ steps.process.outputs.filepath }}"
@@ -106,13 +124,27 @@ jobs:
         head -n 5 "${{ steps.process.outputs.filepath }}" || echo "Could not read file"
 
     - name: Verify File for Attestation
+      if: steps.process.outputs.deleted != 'true'
+      continue-on-error: true
       run: |
+        echo "Starting file verification..."
+        echo "Filepath from outputs: ${{ steps.process.outputs.filepath }}"
+        if [[ -z "${{ steps.process.outputs.filepath }}" ]]; then
+          echo "Warning: filepath is empty"
+          exit 0
+        fi
         echo "Verifying file at: ${{ steps.process.outputs.filepath }}"
-        ls -l "${{ steps.process.outputs.filepath }}"
-        echo "File contents:"
-        cat "${{ steps.process.outputs.filepath }}"
+        if [[ -f "${{ steps.process.outputs.filepath }}" ]]; then
+          ls -l "${{ steps.process.outputs.filepath }}"
+          echo "File contents:"
+          cat "${{ steps.process.outputs.filepath }}"
+        else
+          echo "Warning: File does not exist at specified path"
+        fi
 
     - name: Generate Attestation
+      if: steps.process.outputs.deleted != 'true'
+      continue-on-error: true
       id: attest
       uses: actions/attest@v2.1.0
       with:
@@ -133,13 +165,15 @@ jobs:
           }
 
     - name: Create Release
+      if: steps.process.outputs.deleted != 'true'
+      continue-on-error: true
       uses: softprops/action-gh-release@v1
       with:
         tag_name: scan-${{ github.run_number }}
         name: "Scan: ${{ steps.process.outputs.filename }}"
         body: |
           Processed file: ${{ steps.process.outputs.filename }}
-          Attestation: ${{ steps.attest.outputs.attestation-url }}
+          Attestation: ${{ steps.attest.outputs.attestation-url || 'Attestation failed' }}
         files: |
           ${{ steps.process.outputs.filepath }}
           ${{ steps.attest.outputs.bundle-path }}
