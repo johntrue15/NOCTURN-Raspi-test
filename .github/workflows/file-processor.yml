@@ -39,6 +39,11 @@ jobs:
         chmod +x $HOME/.local/bin/slsa-verifier
         echo "$HOME/.local/bin" >> $GITHUB_PATH
         
+    - name: Install Dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y jq
+        
     - name: Process File
       id: process
       run: |
@@ -239,8 +244,31 @@ jobs:
         tag_name: scan-${{ github.run_number }}
         name: "Scan: ${{ steps.process.outputs.filename }}"
         body: |
-          Processed file: ${{ steps.process.outputs.filename }}
-          Attestation: ${{ steps.attest.outputs.attestation-url || 'Attestation failed' }}
+          # Scan Details
+          
+          | Category | Field | Value |
+          |----------|-------|-------|
+          | **File Information** | File name | ${{ steps.process.outputs.filename }} |
+          | | File format | PCA (Processed to JSON) |
+          | | File size | $(stat -f%z "${{ steps.process.outputs.filepath }}") bytes |
+          | **Image Acquisition** | Modality | X-Ray Computed Tomography (CT/microCT) |
+          | | Device | NOCTURN Raspberry Pi Scanner |
+          | | Device facility | Custom Build |
+          | **Scan Parameters** | Voltage | $(jq -r '.voltage // "N/A"' "${{ steps.process.outputs.filepath }}") |
+          | | Current | $(jq -r '.current // "N/A"' "${{ steps.process.outputs.filepath }}") |
+          | | Exposure time | $(jq -r '.exposure // "N/A"' "${{ steps.process.outputs.filepath }}") |
+          | | Resolution | $(jq -r '.resolution // "N/A"' "${{ steps.process.outputs.filepath }}") |
+          | **Processing** | Processing date | $(date -u +"%Y-%m-%d") |
+          | | Processing software | NOCTURN PCA Parser |
+          | | Attestation | ${{ steps.attest.outputs.attestation-url || 'Attestation failed' }} |
+          | **Usage Rights** | License | MIT |
+          | | Commercial use | Permitted |
+          | | Attribution required | Yes |
+          
+          ## Included Files
+          1. Original PCA file
+          2. Processed JSON file
+          3. Attestation bundle
         files: |
           ${{ steps.process.outputs.filepath }}
           ${{ steps.attest.outputs.bundle-path }}
