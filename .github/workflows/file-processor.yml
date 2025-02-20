@@ -65,6 +65,13 @@ jobs:
         echo "File contents preview:"
         head -n 5 "${{ steps.process.outputs.filepath }}" || echo "Could not read file"
 
+    - name: Verify File for Attestation
+      run: |
+        echo "Verifying file at: ${{ steps.process.outputs.filepath }}"
+        ls -l "${{ steps.process.outputs.filepath }}"
+        echo "File contents:"
+        cat "${{ steps.process.outputs.filepath }}"
+
     - name: Generate Attestation
       id: attest
       uses: actions/attest@v2.1.0
