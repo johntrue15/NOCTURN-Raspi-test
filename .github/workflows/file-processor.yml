@@ -246,16 +246,27 @@ jobs:
         # Get file info - using Linux stat format
         FILE_SIZE=$(stat -c%s "${{ steps.process.outputs.filepath }}" || echo "N/A")
         
+        # Get the original PCA file path
+        PCA_FILE="data/input/$(basename "${{ steps.process.outputs.filename }}" .json)"
+        
+        # Extract system name and version from PCA file
+        echo "Looking for system info in: $PCA_FILE"
+        SYSTEM_NAME=$(grep -o 'SystemName=.*' "$PCA_FILE" | cut -d'=' -f2 || echo "v|tome|x m")
+        SOFTWARE_VERSION=$(grep -o 'Version=[0-9.]*' "$PCA_FILE" | cut -d'=' -f2 || echo "2.8.2.20099")
+        echo "Extracted system name: $SYSTEM_NAME"
+        echo "Extracted software version: $SOFTWARE_VERSION"
+        
+        # Extract NumberImages from PCA file
+        echo "Looking for NumberImages in: $PCA_FILE"
+        NUM_IMAGES=$(grep -o 'NumberImages=[0-9]*' "$PCA_FILE" | cut -d'=' -f2 || echo "N/A")
+        echo "Extracted NumberImages from PCA: $NUM_IMAGES"
+        
         # Extract JSON values with error checking
         function get_json_value() {
           local value
           value=$(jq -r ".$1 // \"N/A\"" "${{ steps.process.outputs.filepath }}" 2>/dev/null || echo "N/A")
           echo "$value"
         }
-        
-        # Debug the raw JSON content
-        echo "Raw JSON content:"
-        cat "${{ steps.process.outputs.filepath }}"
         
         # Get all values with error handling
         DIM_X=$(get_json_value "DimX")
@@ -264,15 +275,6 @@ jobs:
         PIXEL_X=$(get_json_value "PixelsizeX")
         PIXEL_Y=$(get_json_value "PixelsizeY")
         VOXEL_X=$(get_json_value "VoxelSizeX")
-        
-        # Try different ways to get NumberImages
-        NUM_IMAGES_RAW=$(jq '.' "${{ steps.process.outputs.filepath }}" | grep -i "numberimages" || echo "Not found")
-        echo "Raw NumberImages line: $NUM_IMAGES_RAW"
-        
-        # Extract number from NumberImages=1000 format
-        NUM_IMAGES=$(grep -o 'NumberImages=[0-9]*' "${{ steps.process.outputs.filepath }}" | cut -d'=' -f2 || echo "N/A")
-        echo "Extracted NumberImages: $NUM_IMAGES"
-        
         EVENT_DATE=$(get_json_value "Date")
         FILTER=$(get_json_value "Filter")
         EXPOSURE=$(get_json_value "TimingVal")
@@ -282,6 +284,11 @@ jobs:
         FDD=$(get_json_value "FDD")
         FOD=$(get_json_value "FOD")
         MAG=$(get_json_value "Magnification")
+        
+        # Debug output
+        echo "PCA file contents:"
+        cat "$PCA_FILE"
+        echo "NumberImages value: $NUM_IMAGES"
         
         # Calculate power (voltage * current in watts)
         if [[ "$VOLTAGE" != "N/A" && "$CURRENT" != "N/A" ]]; then
@@ -310,6 +317,16 @@ jobs:
         echo "SOD: $SOD"
         echo "SDD: $SDD"
         
+        # Get the creator (GitHub username)
+        if [[ "${{ github.event_name }}" == "push" ]]; then
+          CREATOR="${{ github.event.pusher.name }}"
+        elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+          CREATOR="${{ github.actor }}"
+        else
+          CREATOR="unknown"
+        fi
+        echo "Creator: $CREATOR"
+        
         # Generate the release notes
         cat > "$NOTES" << EOF
         # File Object Details
@@ -336,11 +353,11 @@ jobs:
         | Field | Value |
         |-------|-------|
         | Modality | X-Ray Computed Tomography (CT/microCT) |
-        | Device | NOCTURN Raspberry Pi Scanner |
+        | Device | ${SYSTEM_NAME} |
         | Device facility | Custom Build |
-        | Creator | $(git config user.name || echo "github-actions[bot]") |
+        | Creator | ${CREATOR} |
         | Event date | ${EVENT_DATE} |
-        | Software | NOCTURN PCA Parser |
+        | Software | phoenix datos|x ${SOFTWARE_VERSION} |
         | Filter | ${FILTER} |
         | Exposure time | ${EXPOSURE} ms |
         | Flux normalization | Yes |
