@@ -253,6 +253,10 @@ jobs:
           echo "$value"
         }
         
+        # Debug the raw JSON content
+        echo "Raw JSON content:"
+        cat "${{ steps.process.outputs.filepath }}"
+        
         # Get all values with error handling
         DIM_X=$(get_json_value "DimX")
         DIM_Y=$(get_json_value "DimY")
@@ -260,24 +264,51 @@ jobs:
         PIXEL_X=$(get_json_value "PixelsizeX")
         PIXEL_Y=$(get_json_value "PixelsizeY")
         VOXEL_X=$(get_json_value "VoxelSizeX")
-        NUM_IMAGES=$(get_json_value "NumberImages")
+        
+        # Try different ways to get NumberImages
+        NUM_IMAGES_RAW=$(jq '.' "${{ steps.process.outputs.filepath }}" | grep -i "numberimages" || echo "Not found")
+        echo "Raw NumberImages line: $NUM_IMAGES_RAW"
+        
+        # Extract number from NumberImages=1000 format
+        NUM_IMAGES=$(grep -o 'NumberImages=[0-9]*' "${{ steps.process.outputs.filepath }}" | cut -d'=' -f2 || echo "N/A")
+        echo "Extracted NumberImages: $NUM_IMAGES"
+        
         EVENT_DATE=$(get_json_value "Date")
         FILTER=$(get_json_value "Filter")
-        EXPOSURE=$(get_json_value "ExposureTime")
-        FRAME_AVG=$(get_json_value "FrameAveraging")
-        PROJECTIONS=$(get_json_value "Projections")
+        EXPOSURE=$(get_json_value "TimingVal")
+        FRAME_AVG=$(get_json_value "Avg")
         VOLTAGE=$(get_json_value "Voltage")
-        POWER=$(get_json_value "Power")
         CURRENT=$(get_json_value "Current")
-        SOD=$(get_json_value "SourceObjectDistance")
-        SDD=$(get_json_value "SourceDetectorDistance")
-        MAG=$(get_json_value "OpticalMagnification")
+        FDD=$(get_json_value "FDD")
+        FOD=$(get_json_value "FOD")
+        MAG=$(get_json_value "Magnification")
+        
+        # Calculate power (voltage * current in watts)
+        if [[ "$VOLTAGE" != "N/A" && "$CURRENT" != "N/A" ]]; then
+          POWER=$(echo "$VOLTAGE * $CURRENT / 1000" | bc -l)
+          POWER=$(printf "%.2f" $POWER)
+        else
+          POWER="N/A"
+        fi
+        
+        # Calculate SOD and SDD from FOD and FDD
+        if [[ "$FDD" != "N/A" && "$FOD" != "N/A" ]]; then
+          SOD=$FOD
+          SDD=$FDD
+        else
+          SOD="N/A"
+          SDD="N/A"
+        fi
         
         # Debug output
         echo "Extracted values:"
         echo "File size: $FILE_SIZE"
-        echo "DimX: $DIM_X"
-        echo "DimY: $DIM_Y"
+        echo "Number of images: $NUM_IMAGES"
+        echo "Exposure time: $EXPOSURE"
+        echo "Frame averaging: $FRAME_AVG"
+        echo "Power: $POWER"
+        echo "SOD: $SOD"
+        echo "SDD: $SDD"
         
         # Generate the release notes
         cat > "$NOTES" << EOF
@@ -311,25 +342,20 @@ jobs:
         | Event date | ${EVENT_DATE} |
         | Software | NOCTURN PCA Parser |
         | Filter | ${FILTER} |
-        | Exposure time | ${EXPOSURE} |
+        | Exposure time | ${EXPOSURE} ms |
         | Flux normalization | Yes |
         | Shading correction | Yes |
         | Frame averaging | ${FRAME_AVG} |
-        | Projections | ${PROJECTIONS} |
+        | Projections | ${NUM_IMAGES} |
         | Voltage | ${VOLTAGE} |
-        | Power | ${POWER} |
+        | Power | ${POWER} W |
         | Amperage | ${CURRENT} |
         | Target material | Tungsten |
         | Detector type | CMOS |
-        | Source object distance | ${SOD} |
-        | Source detector distance | ${SDD} |
-        | Optical magnification | ${MAG} |
+        | Source object distance | ${SOD} mm |
+        | Source detector distance | ${SDD} mm |
+        | Optical magnification | ${MAG}x |
         | Attestation | ${{ steps.attest.outputs.attestation-url || 'Attestation failed' }} |
-        
-        ## Included Files
-        1. Original PCA file
-        2. Processed JSON file
-        3. Attestation bundle
         EOF
         
         # Debug the generated notes
