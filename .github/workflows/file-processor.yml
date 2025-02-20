@@ -45,13 +45,22 @@ jobs:
           INPUT_FILE="data/input/${{ github.event.inputs.filename }}"
           OUTPUT_NAME=$(basename "${{ github.event.inputs.filename }}" .pca).pca.json
           python3 .github/scripts/pca_to_json.py "$INPUT_FILE"
-          OUTPUT_PATH="$(pwd)/data/output/$OUTPUT_NAME"
+          OUTPUT_PATH="data/output/$OUTPUT_NAME"
           echo "filename=$OUTPUT_NAME" >> $GITHUB_OUTPUT
           echo "filepath=$OUTPUT_PATH" >> $GITHUB_OUTPUT
         else
-          FULL_PATH="$(pwd)/${{ github.event.inputs.filename }}"
-          echo "filename=${{ github.event.inputs.filename }}" >> $GITHUB_OUTPUT
-          echo "filepath=$FULL_PATH" >> $GITHUB_OUTPUT
+          if [[ -f "${{ github.event.inputs.filename }}" ]]; then
+            echo "filename=${{ github.event.inputs.filename }}" >> $GITHUB_OUTPUT
+            echo "filepath=${{ github.event.inputs.filename }}" >> $GITHUB_OUTPUT
+          else
+            echo "Error: File ${{ github.event.inputs.filename }} not found"
+            exit 1
+          fi
+        fi
+        
+        if [[ ! -f "$OUTPUT_PATH" ]]; then
+          echo "Error: Output file was not created"
+          exit 1
         fi
 
     - name: Debug File Path
