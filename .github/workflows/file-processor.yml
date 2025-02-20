@@ -5,12 +5,16 @@ on:
     paths:
       - 'data/input/*.pca'
       - 'json/*.json'
+    paths-ignore:
+      - '**/*.md'
+      - '.gitignore'
   workflow_dispatch:
     inputs:
       filename:
         description: 'File to process'
         required: true
         default: 'Nano Di Side.pca'
+        type: string
 
 permissions:
   contents: write
@@ -41,8 +45,20 @@ jobs:
       run: |
         mkdir -p data/output
         
+        # Check if filename is provided
+        if [[ -z "${{ github.event.inputs.filename }}" ]]; then
+          echo "Error: No filename provided"
+          exit 1
+        fi
+        
         if [[ "${{ github.event.inputs.filename }}" == *.pca ]]; then
           INPUT_FILE="data/input/${{ github.event.inputs.filename }}"
+          # Check if input PCA file exists
+          if [[ ! -f "$INPUT_FILE" ]]; then
+            echo "Error: PCA file '$INPUT_FILE' not found"
+            exit 1
+          fi
+          
           OUTPUT_NAME=$(basename "${{ github.event.inputs.filename }}" .pca).pca.json
           python3 .github/scripts/pca_to_json.py "$INPUT_FILE"
           OUTPUT_PATH="data/output/$OUTPUT_NAME"
