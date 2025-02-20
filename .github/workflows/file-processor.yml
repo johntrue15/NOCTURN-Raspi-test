@@ -244,26 +244,50 @@ jobs:
         tag_name: scan-${{ github.run_number }}
         name: "Scan: ${{ steps.process.outputs.filename }}"
         body: |
-          # Scan Details
+          # File Object Details
           
-          | Category | Field | Value |
-          |----------|-------|-------|
-          | **File Information** | File name | ${{ steps.process.outputs.filename }} |
-          | | File format | PCA (Processed to JSON) |
-          | | File size | $(stat -f%z "${{ steps.process.outputs.filepath }}") bytes |
-          | **Image Acquisition** | Modality | X-Ray Computed Tomography (CT/microCT) |
-          | | Device | NOCTURN Raspberry Pi Scanner |
-          | | Device facility | Custom Build |
-          | **Scan Parameters** | Voltage | $(jq -r '.voltage // "N/A"' "${{ steps.process.outputs.filepath }}") |
-          | | Current | $(jq -r '.current // "N/A"' "${{ steps.process.outputs.filepath }}") |
-          | | Exposure time | $(jq -r '.exposure // "N/A"' "${{ steps.process.outputs.filepath }}") |
-          | | Resolution | $(jq -r '.resolution // "N/A"' "${{ steps.process.outputs.filepath }}") |
-          | **Processing** | Processing date | $(date -u +"%Y-%m-%d") |
-          | | Processing software | NOCTURN PCA Parser |
-          | | Attestation | ${{ steps.attest.outputs.attestation-url || 'Attestation failed' }} |
-          | **Usage Rights** | License | MIT |
-          | | Commercial use | Permitted |
-          | | Attribution required | Yes |
+          | Field | Value |
+          |-------|-------|
+          | File name | ${{ steps.process.outputs.filename }} |
+          | File format | .pca |
+          | File size | $(stat -f%z "${{ steps.process.outputs.filepath }}") bytes |
+          | Image width | $(jq -r '.DimX // "N/A"' "${{ steps.process.outputs.filepath }}") |
+          | Image height | $(jq -r '.DimY // "N/A"' "${{ steps.process.outputs.filepath }}") |
+          | Color space | BlackIsZero |
+          | Color depth | $(jq -r '.BitPP // "N/A"' "${{ steps.process.outputs.filepath }}") |
+          | Compression | Uncompressed |
+          | X pixel spacing | $(jq -r '.PixelsizeX // "N/A"' "${{ steps.process.outputs.filepath }}") |
+          | Y pixel spacing | $(jq -r '.PixelsizeY // "N/A"' "${{ steps.process.outputs.filepath }}") |
+          | Z pixel spacing | $(jq -r '.PixelsizeX // "N/A"' "${{ steps.process.outputs.filepath }}") |
+          | Pixel spacing units | Mm |
+          | Slice thickness | $(jq -r '.VoxelSizeX // "N/A"' "${{ steps.process.outputs.filepath }}") |
+          | Number of images in set | $(jq -r '.NumberImages // "N/A"' "${{ steps.process.outputs.filepath }}") |
+          
+          # Image Acquisition Details
+          
+          | Field | Value |
+          |-------|-------|
+          | Modality | X-Ray Computed Tomography (CT/microCT) |
+          | Device | NOCTURN Raspberry Pi Scanner |
+          | Device facility | Custom Build |
+          | Creator | $(git config user.name) |
+          | Event date | $(jq -r '.Date // "N/A"' "${{ steps.process.outputs.filepath }}") |
+          | Software | NOCTURN PCA Parser |
+          | Filter | $(jq -r '.Filter // "N/A"' "${{ steps.process.outputs.filepath }}") |
+          | Exposure time | $(jq -r '.ExposureTime // "N/A"' "${{ steps.process.outputs.filepath }}") |
+          | Flux normalization | Yes |
+          | Shading correction | Yes |
+          | Frame averaging | $(jq -r '.FrameAveraging // "N/A"' "${{ steps.process.outputs.filepath }}") |
+          | Projections | $(jq -r '.Projections // "N/A"' "${{ steps.process.outputs.filepath }}") |
+          | Voltage | $(jq -r '.Voltage // "N/A"' "${{ steps.process.outputs.filepath }}") |
+          | Power | $(jq -r '.Power // "N/A"' "${{ steps.process.outputs.filepath }}") |
+          | Amperage | $(jq -r '.Current // "N/A"' "${{ steps.process.outputs.filepath }}") |
+          | Target material | Tungsten |
+          | Detector type | CMOS |
+          | Source object distance | $(jq -r '.SourceObjectDistance // "N/A"' "${{ steps.process.outputs.filepath }}") |
+          | Source detector distance | $(jq -r '.SourceDetectorDistance // "N/A"' "${{ steps.process.outputs.filepath }}") |
+          | Optical magnification | $(jq -r '.OpticalMagnification // "N/A"' "${{ steps.process.outputs.filepath }}") |
+          | Attestation | ${{ steps.attest.outputs.attestation-url || 'Attestation failed' }} |
           
           ## Included Files
           1. Original PCA file
