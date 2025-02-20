@@ -46,8 +46,11 @@ jobs:
         
         # Check if this is a file deletion event
         if [[ "${{ github.event_name }}" == "push" ]]; then
+          # Fetch git history first
+          git fetch --prune --unshallow
+          
           # Get the list of deleted files from git
-          DELETED_FILES=$(git diff --name-only --diff-filter=D ${{ github.event.before }} ${{ github.event.after }})
+          DELETED_FILES=$(git diff --name-only --diff-filter=D ${{ github.event.before }} ${{ github.event.after }} || echo "")
           if [[ -n "$DELETED_FILES" ]]; then
             echo "Detected file deletion event - skipping processing"
             exit 0
