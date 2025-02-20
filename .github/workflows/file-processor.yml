@@ -236,6 +236,94 @@ jobs:
             }
           }
 
+    - name: Generate Release Notes
+      if: steps.process.outputs.processed == 'true'
+      id: release_notes
+      run: |
+        # Create a temporary file for the release notes
+        NOTES=$(mktemp)
+        
+        # Get file info
+        FILE_SIZE=$(stat -f%s "${{ steps.process.outputs.filepath }}")
+        
+        # Extract JSON values
+        DIM_X=$(jq -r '.DimX // "N/A"' "${{ steps.process.outputs.filepath }}")
+        DIM_Y=$(jq -r '.DimY // "N/A"' "${{ steps.process.outputs.filepath }}")
+        BIT_PP=$(jq -r '.BitPP // "N/A"' "${{ steps.process.outputs.filepath }}")
+        PIXEL_X=$(jq -r '.PixelsizeX // "N/A"' "${{ steps.process.outputs.filepath }}")
+        PIXEL_Y=$(jq -r '.PixelsizeY // "N/A"' "${{ steps.process.outputs.filepath }}")
+        VOXEL_X=$(jq -r '.VoxelSizeX // "N/A"' "${{ steps.process.outputs.filepath }}")
+        NUM_IMAGES=$(jq -r '.NumberImages // "N/A"' "${{ steps.process.outputs.filepath }}")
+        EVENT_DATE=$(jq -r '.Date // "N/A"' "${{ steps.process.outputs.filepath }}")
+        FILTER=$(jq -r '.Filter // "N/A"' "${{ steps.process.outputs.filepath }}")
+        EXPOSURE=$(jq -r '.ExposureTime // "N/A"' "${{ steps.process.outputs.filepath }}")
+        FRAME_AVG=$(jq -r '.FrameAveraging // "N/A"' "${{ steps.process.outputs.filepath }}")
+        PROJECTIONS=$(jq -r '.Projections // "N/A"' "${{ steps.process.outputs.filepath }}")
+        VOLTAGE=$(jq -r '.Voltage // "N/A"' "${{ steps.process.outputs.filepath }}")
+        POWER=$(jq -r '.Power // "N/A"' "${{ steps.process.outputs.filepath }}")
+        CURRENT=$(jq -r '.Current // "N/A"' "${{ steps.process.outputs.filepath }}")
+        SOD=$(jq -r '.SourceObjectDistance // "N/A"' "${{ steps.process.outputs.filepath }}")
+        SDD=$(jq -r '.SourceDetectorDistance // "N/A"' "${{ steps.process.outputs.filepath }}")
+        MAG=$(jq -r '.OpticalMagnification // "N/A"' "${{ steps.process.outputs.filepath }}")
+        
+        # Generate the release notes
+        cat > "$NOTES" << EOF
+        # File Object Details
+        
+        | Field | Value |
+        |-------|-------|
+        | File name | ${{ steps.process.outputs.filename }} |
+        | File format | .pca |
+        | File size | ${FILE_SIZE} bytes |
+        | Image width | ${DIM_X} |
+        | Image height | ${DIM_Y} |
+        | Color space | BlackIsZero |
+        | Color depth | ${BIT_PP} |
+        | Compression | Uncompressed |
+        | X pixel spacing | ${PIXEL_X} |
+        | Y pixel spacing | ${PIXEL_Y} |
+        | Z pixel spacing | ${PIXEL_X} |
+        | Pixel spacing units | Mm |
+        | Slice thickness | ${VOXEL_X} |
+        | Number of images in set | ${NUM_IMAGES} |
+        
+        # Image Acquisition Details
+        
+        | Field | Value |
+        |-------|-------|
+        | Modality | X-Ray Computed Tomography (CT/microCT) |
+        | Device | NOCTURN Raspberry Pi Scanner |
+        | Device facility | Custom Build |
+        | Creator | $(git config user.name) |
+        | Event date | ${EVENT_DATE} |
+        | Software | NOCTURN PCA Parser |
+        | Filter | ${FILTER} |
+        | Exposure time | ${EXPOSURE} |
+        | Flux normalization | Yes |
+        | Shading correction | Yes |
+        | Frame averaging | ${FRAME_AVG} |
+        | Projections | ${PROJECTIONS} |
+        | Voltage | ${VOLTAGE} |
+        | Power | ${POWER} |
+        | Amperage | ${CURRENT} |
+        | Target material | Tungsten |
+        | Detector type | CMOS |
+        | Source object distance | ${SOD} |
+        | Source detector distance | ${SDD} |
+        | Optical magnification | ${MAG} |
+        | Attestation | ${{ steps.attest.outputs.attestation-url || 'Attestation failed' }} |
+        
+        ## Included Files
+        1. Original PCA file
+        2. Processed JSON file
+        3. Attestation bundle
+        EOF
+        
+        # Save the release notes to the output
+        echo "notes<<EOF" >> $GITHUB_OUTPUT
+        cat "$NOTES" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+
     - name: Create Release
       if: steps.process.outputs.processed == 'true'
       continue-on-error: true
@@ -243,56 +331,7 @@ jobs:
       with:
         tag_name: scan-${{ github.run_number }}
         name: "Scan: ${{ steps.process.outputs.filename }}"
-        body: |
-          # File Object Details
-          
-          | Field | Value |
-          |-------|-------|
-          | File name | ${{ steps.process.outputs.filename }} |
-          | File format | .pca |
-          | File size | $(stat -f%z "${{ steps.process.outputs.filepath }}") bytes |
-          | Image width | $(jq -r '.DimX // "N/A"' "${{ steps.process.outputs.filepath }}") |
-          | Image height | $(jq -r '.DimY // "N/A"' "${{ steps.process.outputs.filepath }}") |
-          | Color space | BlackIsZero |
-          | Color depth | $(jq -r '.BitPP // "N/A"' "${{ steps.process.outputs.filepath }}") |
-          | Compression | Uncompressed |
-          | X pixel spacing | $(jq -r '.PixelsizeX // "N/A"' "${{ steps.process.outputs.filepath }}") |
-          | Y pixel spacing | $(jq -r '.PixelsizeY // "N/A"' "${{ steps.process.outputs.filepath }}") |
-          | Z pixel spacing | $(jq -r '.PixelsizeX // "N/A"' "${{ steps.process.outputs.filepath }}") |
-          | Pixel spacing units | Mm |
-          | Slice thickness | $(jq -r '.VoxelSizeX // "N/A"' "${{ steps.process.outputs.filepath }}") |
-          | Number of images in set | $(jq -r '.NumberImages // "N/A"' "${{ steps.process.outputs.filepath }}") |
-          
-          # Image Acquisition Details
-          
-          | Field | Value |
-          |-------|-------|
-          | Modality | X-Ray Computed Tomography (CT/microCT) |
-          | Device | NOCTURN Raspberry Pi Scanner |
-          | Device facility | Custom Build |
-          | Creator | $(git config user.name) |
-          | Event date | $(jq -r '.Date // "N/A"' "${{ steps.process.outputs.filepath }}") |
-          | Software | NOCTURN PCA Parser |
-          | Filter | $(jq -r '.Filter // "N/A"' "${{ steps.process.outputs.filepath }}") |
-          | Exposure time | $(jq -r '.ExposureTime // "N/A"' "${{ steps.process.outputs.filepath }}") |
-          | Flux normalization | Yes |
-          | Shading correction | Yes |
-          | Frame averaging | $(jq -r '.FrameAveraging // "N/A"' "${{ steps.process.outputs.filepath }}") |
-          | Projections | $(jq -r '.Projections // "N/A"' "${{ steps.process.outputs.filepath }}") |
-          | Voltage | $(jq -r '.Voltage // "N/A"' "${{ steps.process.outputs.filepath }}") |
-          | Power | $(jq -r '.Power // "N/A"' "${{ steps.process.outputs.filepath }}") |
-          | Amperage | $(jq -r '.Current // "N/A"' "${{ steps.process.outputs.filepath }}") |
-          | Target material | Tungsten |
-          | Detector type | CMOS |
-          | Source object distance | $(jq -r '.SourceObjectDistance // "N/A"' "${{ steps.process.outputs.filepath }}") |
-          | Source detector distance | $(jq -r '.SourceDetectorDistance // "N/A"' "${{ steps.process.outputs.filepath }}") |
-          | Optical magnification | $(jq -r '.OpticalMagnification // "N/A"' "${{ steps.process.outputs.filepath }}") |
-          | Attestation | ${{ steps.attest.outputs.attestation-url || 'Attestation failed' }} |
-          
-          ## Included Files
-          1. Original PCA file
-          2. Processed JSON file
-          3. Attestation bundle
+        body: ${{ steps.release_notes.outputs.notes }}
         files: |
           ${{ steps.process.outputs.filepath }}
           ${{ steps.attest.outputs.bundle-path }}
