@@ -249,23 +249,28 @@ jobs:
         # Get the original PCA file path
         PCA_FILE="data/input/$(basename "${{ steps.process.outputs.filename }}" .json)"
         
+        # Function to clean up values (remove newlines and extra spaces)
+        function clean_value() {
+          echo "$1" | tr -d '\n' | tr -s ' ' | sed 's/^ *//;s/ *$//'
+        }
+        
         # Extract system name and version from PCA file
         echo "Looking for system info in: $PCA_FILE"
-        SYSTEM_NAME=$(grep -o 'SystemName=.*' "$PCA_FILE" | cut -d'=' -f2 || echo "v|tome|x m")
-        SOFTWARE_VERSION=$(grep -o 'Version=[0-9.]*' "$PCA_FILE" | cut -d'=' -f2 || echo "2.8.2.20099")
+        SYSTEM_NAME=$(grep -o 'SystemName=.*' "$PCA_FILE" | cut -d'=' -f2 | clean_value || echo "v|tome|x m")
+        SOFTWARE_VERSION=$(grep -o 'Version=[0-9.]*' "$PCA_FILE" | cut -d'=' -f2 | clean_value || echo "2.8.2.20099")
         echo "Extracted system name: $SYSTEM_NAME"
         echo "Extracted software version: $SOFTWARE_VERSION"
         
         # Extract NumberImages from PCA file
         echo "Looking for NumberImages in: $PCA_FILE"
-        NUM_IMAGES=$(grep -o 'NumberImages=[0-9]*' "$PCA_FILE" | cut -d'=' -f2 || echo "N/A")
+        NUM_IMAGES=$(grep -o 'NumberImages=[0-9]*' "$PCA_FILE" | cut -d'=' -f2 | clean_value || echo "N/A")
         echo "Extracted NumberImages from PCA: $NUM_IMAGES"
         
         # Extract JSON values with error checking
         function get_json_value() {
           local value
           value=$(jq -r ".$1 // \"N/A\"" "${{ steps.process.outputs.filepath }}" 2>/dev/null || echo "N/A")
-          echo "$value"
+          clean_value "$value"
         }
         
         # Get all values with error handling
@@ -327,13 +332,13 @@ jobs:
         fi
         echo "Creator: $CREATOR"
         
-        # Generate the release notes
+        # Generate the release notes with cleaned values
         cat > "$NOTES" << EOF
         # File Object Details
         
         | Field | Value |
         |-------|-------|
-        | File name | ${{ steps.process.outputs.filename }} |
+        | File name | $(clean_value "${{ steps.process.outputs.filename }}") |
         | File format | .pca |
         | File size | ${FILE_SIZE} bytes |
         | Image width | ${DIM_X} |
