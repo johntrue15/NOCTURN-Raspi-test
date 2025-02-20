@@ -81,12 +81,13 @@ jobs:
                 echo "Converting PCA file to JSON: $file -> $OUTPUT_NAME"
                 python3 .github/scripts/pca_to_json.py "$file"
                 OUTPUT_PATH="data/output/$OUTPUT_NAME"
-                echo "filename=$OUTPUT_NAME" >> $GITHUB_OUTPUT
-                echo "filepath=$OUTPUT_PATH" >> $GITHUB_OUTPUT
                 
                 # Verify output was created
                 if [[ -f "$OUTPUT_PATH" ]]; then
                   echo "Successfully created output file: $OUTPUT_PATH"
+                  echo "filename=$OUTPUT_NAME" >> $GITHUB_OUTPUT
+                  echo "filepath=$OUTPUT_PATH" >> $GITHUB_OUTPUT
+                  echo "processed=true" >> $GITHUB_OUTPUT
                 else
                   echo "Failed to create output file: $OUTPUT_PATH"
                   exit 1
@@ -145,21 +146,40 @@ jobs:
           fi
         fi
         
-        # Verify we have set the outputs
-        if [[ -z "${{ steps.process.outputs.filepath }}" ]]; then
+        # Don't exit if we have processed files
+        if [[ -n "$OUTPUT_PATH" ]]; then
+          echo "processed=true" >> $GITHUB_OUTPUT
+          echo "deleted=false" >> $GITHUB_OUTPUT
+        else
           echo "No valid files to process"
+          echo "processed=false" >> $GITHUB_OUTPUT
           echo "deleted=true" >> $GITHUB_OUTPUT
           exit 0
         fi
-        
-        echo "deleted=false" >> $GITHUB_OUTPUT
         
         # Debug outputs
         echo "GITHUB_OUTPUT contents:"
         cat $GITHUB_OUTPUT
 
+    - name: Commit Output
+      if: steps.process.outputs.processed == 'true'
+      run: |
+        git config --local user.email "github-actions[bot]@users.noreply.github.com"
+        git config --local user.name "github-actions[bot]"
+        git add data/output/
+        git commit -m "Add processed output for ${{ steps.process.outputs.filename }}" || echo "No changes to commit"
+        git push
+
+    - name: Upload Artifact
+      if: steps.process.outputs.processed == 'true'
+      uses: actions/upload-artifact@v3
+      with:
+        name: processed-file
+        path: ${{ steps.process.outputs.filepath }}
+        retention-days: 5
+
     - name: Debug File Path
-      if: steps.process.outputs.deleted != 'true'
+      if: steps.process.outputs.processed == 'true'
       run: |
         echo "Current directory: $(pwd)"
         echo "File path from output: ${{ steps.process.outputs.filepath }}"
@@ -171,7 +191,7 @@ jobs:
         head -n 5 "${{ steps.process.outputs.filepath }}" || echo "Could not read file"
 
     - name: Verify File for Attestation
-      if: steps.process.outputs.deleted != 'true'
+      if: steps.process.outputs.processed == 'true'
       continue-on-error: true
       run: |
         echo "Starting file verification..."
@@ -190,7 +210,7 @@ jobs:
         fi
 
     - name: Generate Attestation
-      if: steps.process.outputs.deleted != 'true'
+      if: steps.process.outputs.processed == 'true'
       continue-on-error: true
       id: attest
       uses: actions/attest@v2.1.0
@@ -212,7 +232,7 @@ jobs:
           }
 
     - name: Create Release
-      if: steps.process.outputs.deleted != 'true'
+      if: steps.process.outputs.processed == 'true'
       continue-on-error: true
       uses: softprops/action-gh-release@v1
       with:
