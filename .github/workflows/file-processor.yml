@@ -68,15 +68,29 @@ jobs:
           
           # Process only PCA or JSON files
           while IFS= read -r file; do
-            if [[ "$file" =~ ^data/input/.*\.pca$ || "$file" =~ ^json/.*\.json$ ]]; then
+            echo "Checking file: $file"
+            # Debug pattern matching
+            [[ "$file" == data/input/*.pca ]] && echo "Matches PCA pattern"
+            [[ "$file" == json/*.json ]] && echo "Matches JSON pattern"
+            
+            if [[ "$file" == data/input/*.pca || "$file" == json/*.json ]]; then
               echo "Processing changed file: $file"
               
               if [[ "$file" == *.pca ]]; then
                 OUTPUT_NAME=$(basename "$file" .pca).pca.json
+                echo "Converting PCA file to JSON: $file -> $OUTPUT_NAME"
                 python3 .github/scripts/pca_to_json.py "$file"
                 OUTPUT_PATH="data/output/$OUTPUT_NAME"
                 echo "filename=$OUTPUT_NAME" >> $GITHUB_OUTPUT
                 echo "filepath=$OUTPUT_PATH" >> $GITHUB_OUTPUT
+                
+                # Verify output was created
+                if [[ -f "$OUTPUT_PATH" ]]; then
+                  echo "Successfully created output file: $OUTPUT_PATH"
+                else
+                  echo "Failed to create output file: $OUTPUT_PATH"
+                  exit 1
+                fi
               else
                 echo "filename=$file" >> $GITHUB_OUTPUT
                 echo "filepath=$file" >> $GITHUB_OUTPUT
@@ -84,6 +98,8 @@ jobs:
               
               # We'll process only the first matching file
               break
+            else
+              echo "File does not match patterns: $file"
             fi
           done <<< "$CHANGED_FILES"
           
